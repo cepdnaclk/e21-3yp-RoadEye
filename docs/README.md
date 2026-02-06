@@ -3,8 +3,8 @@ layout: home
 permalink: index.html
 
 # Please update this with your repository name and project title
-repository-name: eYY-3yp-project-template
-title: Project Template
+repository-name: eYY-3yp-RoadEye
+title: RoadEye
 ---
 
 [comment]: # "This is the standard layout for the project, but you can clean this and use your own template"
@@ -14,9 +14,10 @@ title: Project Template
 ---
 
 ## Team
--  eNumber, Name, [email](mailto:name@email.com)
--  eNumber, Name, [email](mailto:name@email.com)
--  eNumber, Name, [email](mailto:name@email.com)
+-  E/21/019, Adikari A.M.H.S.,(e21019@eng.pdn.ac.lk)
+-  E/21/371, Senawirathne D.M.W.J.I,(e21371@eng.pdn.ac.lk)
+-  E/21/416, Uthpala J.A.S,(e21416@eng.pdn.ac.lk)
+-  E/21/433, Wickramanayake,(e21443@eng.pdn.ac.lk)
 
 <!-- Image (photo/drawing of the final hardware) should be here -->
 
@@ -35,7 +36,18 @@ title: Project Template
 
 ## Introduction
 
-Description of the real world problem and solution, impact
+Motorcycle riders are among the most vulnerable road users, with accidents often 
+caused by limited situational awareness, delayed reactions, and driver distraction. This 
+project proposes the development of a smart motorcycle helmet system aimed at 
+significantly enhancing rider safety while minimizing cognitive and visual load. By 
+combining sensor fusion, real-time hazard detection, and carefully designed 
+human–machine interaction, the smart helmet delivers critical information through 
+eyes-free and hands-free feedback methods such as haptics, audio, and minimal HUD 
+visuals. The system prioritizes essential alerts, adaptive warnings, and context-aware 
+assistance to ensure that riders remain focused on the road at all times. Through 
+intelligent design and embedded safety features, the proposed smart helmet seeks to 
+reduce accident risk, improve riding awareness, and create a safer and more intuitive 
+riding experience.
 
 
 ## Solution Architecture
