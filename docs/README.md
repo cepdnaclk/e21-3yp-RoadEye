@@ -17,7 +17,7 @@ title: RoadEye
 -  E/21/019, Adikari A.M.H.S.,(e21019@eng.pdn.ac.lk)
 -  E/21/371, Senawirathne D.M.W.J.I,(e21371@eng.pdn.ac.lk)
 -  E/21/416, Uthpala J.A.S,(e21416@eng.pdn.ac.lk)
--  E/21/433, Wickramanayake,(e21443@eng.pdn.ac.lk)
+-  E/21/433, Wickramanayake N.S.,(e21443@eng.pdn.ac.lk)
 
 <!-- Image (photo/drawing of the final hardware) should be here -->
 
