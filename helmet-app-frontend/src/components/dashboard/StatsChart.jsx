@@ -27,7 +27,7 @@ export default function StatsChart() {
       </div>
 
       {/* Bar chart */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 90 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 120 }}>
         {weekData.map((val, i) => (
           <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
             <div style={{ width: '100%', height: `${(val / maxVal) * 80}px`, background: i === 5 ? C.primary : 'rgba(124,92,245,0.25)', borderRadius: '6px 6px 0 0', transition: 'height 0.4s ease' }} />

@@ -62,3 +62,16 @@ Currently uses simple in-memory state. To connect a real backend, update `src/ho
 - React Router v6
 - Vite
 - Plus Jakarta Sans (Google Fonts)
+
+
+App Opens
+    ↓
+SplashScreen (3 seconds)
+    ↓ checks SharedPreferences
+Already logged in? ──YES──→ DashboardScreen
+    ↓ NO
+LoginScreen
+    ↓ enter email + password
+AuthService saves to SharedPreferences
+    ↓
+DashboardScreen
