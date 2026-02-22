@@ -9,13 +9,30 @@ export default function LoginForm({ onLogin }) {
   const [password, setPassword] = useState('')
   const [showPw, setShowPw]     = useState(false)
   const [focused, setFocused]   = useState('')
+  const [emailError, setEmailError] = useState('')
+
+  const validateEmail = (val) => {
+    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)
+    setEmailError(valid ? '' : 'Please enter a valid email address')
+  }
 
   const inputWrap = (field) => ({
     position: 'relative',
     background: '#F3F4F8',
     borderRadius: 14,
-    border: `2px solid ${focused === field ? C.primary : 'transparent'}`,
-    boxShadow: focused === field ? `0 0 0 3px ${C.primary}22` : 'none',
+    border: `2px solid ${
+      field === 'email' && emailError
+        ? '#EF4444'
+        : focused === field
+        ? C.primary
+        : 'transparent'
+    }`,
+    boxShadow:
+      field === 'email' && emailError
+        ? '0 0 0 3px rgba(239,68,68,0.15)'
+        : focused === field
+        ? `0 0 0 3px ${C.primary}22`
+        : 'none',
     transition: 'border-color 0.2s, box-shadow 0.2s',
   })
 
@@ -36,12 +53,17 @@ export default function LoginForm({ onLogin }) {
             type="email"
             placeholder="Enter email"
             value={email}
-            onChange={e => setEmail(e.target.value)}
+            onChange={e => { setEmail(e.target.value); if (emailError) validateEmail(e.target.value) }}
             onFocus={() => setFocused('email')}
-            onBlur={() => setFocused('')}
+            onBlur={() => { setFocused(''); validateEmail(email); }}
             style={styles.input}
           />
         </div>
+        {emailError && (
+          <p style={{ color: '#EF4444', fontSize: 12, fontWeight: 500, marginTop: 6, paddingLeft: 4 }}>
+            ⚠️ {emailError}
+          </p>
+        )}
       </div>
 
       {/* Password */}
