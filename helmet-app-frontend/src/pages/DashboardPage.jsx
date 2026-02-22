@@ -51,14 +51,16 @@ export default function DashboardPage() {
 
         {/* Odometer */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
-          <div style={{ position: 'relative', width: 160, height: 90 }}>
-            <svg width="160" height="90" viewBox="0 0 160 90">
-              <path d="M 15 85 A 70 70 0 0 1 145 85" fill="none" stroke="#E5E7EB" strokeWidth="10" strokeLinecap="round"/>
-              <path d="M 15 85 A 70 70 0 0 1 145 85" fill="none" stroke={C.primary} strokeWidth="10" strokeLinecap="round" strokeDasharray="220" strokeDashoffset="55"/>
+          <div style={{ position: 'relative', width: 180, height: 110 }}>
+            <svg width="180" height="110" viewBox="0 0 180 110">
+              {/* Background arc */}
+              <path d="M 20 100 A 50 50 0 0 1 160 100" fill="none" stroke="#E5E7EB" strokeWidth="10" strokeLinecap="round"/>
+              {/* Filled arc */}
+              <path d="M 20 100 A 50 50 0 0 1 160 100" fill="none" stroke="#4F46E5" strokeWidth="10" strokeLinecap="round" strokeDasharray="240" strokeDashoffset="60"/>
             </svg>
-            <div style={{ position: 'absolute', top: '30%', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', whiteSpace: 'nowrap' }}>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.text }}>11,857</div>
-              <div style={{ fontSize: 10, color: C.muted, fontWeight: 500, border: '1px solid #E5E7EB', borderRadius: 6, padding: '2px 8px', marginTop: 2 }}>Total Distance</div>
+            <div style={{ position: 'absolute', top: '58%', left: '50%', transform: 'translateX(-50%)', textAlign: 'center', whiteSpace: 'nowrap' }}>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#1a1a2e' }}>11,857</div>
+              <div style={{ fontSize: 10, color: '#8892A4', fontWeight: 500, border: '1px solid #E5E7EB', borderRadius: 6, padding: '2px 8px', marginTop: 2 }}>Total Distance</div>
             </div>
           </div>
         </div>
