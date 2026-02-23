@@ -49,12 +49,6 @@ Faster emergency response
 # 🧩 System Architecture
 RoadEye consists of three major components:
 
-This is a sample repository you can use for your Embedded Systems project. Once you followed these instructions, remove the text and add a brief introduction to here.
-
-🧩 System Architecture
-
-RoadEye consists of three major components:
-
 1️⃣ Helmet Unit
 Features
 - Heads-Up Display (HUD)
