@@ -124,9 +124,11 @@ Data Handling
 - Provides analytics by date/week/month
 
 # 📡 Communication Architecture
-Helmet ↔ Bike Module → WiFi
-Helmet ↔ Mobile App → WiFi
-Helmet ↔ Helmet → WiFi (future support)
+- Helmet ↔ Bike Module → WiFi
+
+- Helmet ↔ Mobile App → WiFi
+
+- Helmet ↔ Helmet → WiFi (future support)
 
 # 🚨 Smart Safety Features
 
@@ -157,7 +159,7 @@ Helmet Buckle Reminder
 Anti-Theft Protection
 - Tampering detection in parking mode
 
-🔐 Security & Privacy
+# 🔐 Security & Privacy
 Security
 - Bluetooth pairing authentication
 - Secure OTA firmware updates
