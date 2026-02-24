@@ -19,7 +19,7 @@
 #define TFT_MISO -1
 
 // -------- SPI frequency --------
-#define SPI_FREQUENCY  40000000  // 27 MHz usually fine for ST7735
+#define SPI_FREQUENCY  27000000  // 27 MHz usually fine for ST7735
 
 // Fonts (optional, but fine to keep)
 #define LOAD_GLCD
