@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "RoadEye",
+    "slug": "roadeye",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.roadeye.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "BLUETOOTH",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.roadeye.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "RoadEye needs your location for weather and ride tracking.",
+        "NSBluetoothAlwaysUsageDescription": "RoadEye uses Bluetooth to connect to your smart helmet."
+      }
+    },
+    "plugins": [
+      "expo-location"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "cb704c19-d44b-4c67-a436-4f8671104585"
+      }
+    }
+  }
+}
