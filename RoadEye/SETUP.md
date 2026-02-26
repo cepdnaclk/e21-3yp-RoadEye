@@ -133,7 +133,8 @@ RoadEye/
 | `<div>`                     | `<View>`                            |
 | `<p>`, `<span>`, `<h1>`     | `<Text>`                            |
 | `<input>`                   | `<TextInput>`                       |
-| `<button>`                  | `<TouchableOpacity>`                |
+| `<button>`       git
+           | `<TouchableOpacity>`                |
 | CSS `display: grid`         | `flexWrap: 'wrap'`                  |
 | `react-router-dom`          | `@react-navigation/native`          |
 | `linear-gradient` CSS       | `expo-linear-gradient`              |
