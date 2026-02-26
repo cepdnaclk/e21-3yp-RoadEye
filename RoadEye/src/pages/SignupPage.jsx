@@ -5,12 +5,10 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function SignupPage() {
   const { login }    = useAuth()
   const navigation   = useNavigation()
-  const insets       = useSafeAreaInsets()
 
   const [username, setUsername] = useState('')
   const [email,    setEmail]    = useState('')
@@ -42,7 +40,7 @@ export default function SignupPage() {
   return (
     <ScrollView
       style={styles.scroll}
-      contentContainerStyle={[styles.container, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 32 }]}
+      contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={styles.title}>Sign up</Text>
@@ -55,19 +53,21 @@ export default function SignupPage() {
 
       <Text style={styles.label}>Username</Text>
       <TextInput style={field('username')} placeholder="Enter username" placeholderTextColor="#AAAAB8"
+        autoComplete="off" autoCorrect={false}
         value={username} onChangeText={setUsername}
         onFocus={() => setFocused('username')} onBlur={() => setFocused('')} />
 
       <Text style={styles.label}>Email</Text>
       <TextInput style={field('email')} placeholder="Enter email" placeholderTextColor="#AAAAB8"
-        keyboardType="email-address" autoCapitalize="none"
+        keyboardType="email-address" autoCapitalize="none" autoComplete="off"
         value={email} onChangeText={setEmail}
         onFocus={() => setFocused('email')} onBlur={() => setFocused('')} />
 
       <Text style={styles.label}>Password</Text>
       <View style={[styles.inputWrap, focused === 'pw1' && styles.inputFocused]}>
         <TextInput style={[styles.input, { flex: 1, borderWidth: 0 }]} placeholder="Enter password" placeholderTextColor="#AAAAB8"
-          secureTextEntry={!showPw1} value={password} onChangeText={setPassword}
+          secureTextEntry={!showPw1} autoComplete="off"
+          value={password} onChangeText={setPassword}
           onFocus={() => setFocused('pw1')} onBlur={() => setFocused('')} />
         <TouchableOpacity onPress={() => setShowPw1(!showPw1)} style={styles.eyeBtn}>
           <Text>{showPw1 ? '🙈' : '👁️'}</Text>
@@ -77,7 +77,8 @@ export default function SignupPage() {
       <Text style={styles.label}>Re-enter Password</Text>
       <View style={[styles.inputWrap, focused === 'pw2' && styles.inputFocused]}>
         <TextInput style={[styles.input, { flex: 1, borderWidth: 0 }]} placeholder="Enter password" placeholderTextColor="#AAAAB8"
-          secureTextEntry={!showPw2} value={confirm} onChangeText={setConfirm}
+          secureTextEntry={!showPw2} autoComplete="off"
+          value={confirm} onChangeText={setConfirm}
           onFocus={() => setFocused('pw2')} onBlur={() => setFocused('')} />
         <TouchableOpacity onPress={() => setShowPw2(!showPw2)} style={styles.eyeBtn}>
           <Text>{showPw2 ? '🙈' : '👁️'}</Text>
@@ -101,7 +102,7 @@ export default function SignupPage() {
 
 const styles = StyleSheet.create({
   scroll:       { backgroundColor: '#F8F8FC' },
-  container:    { paddingHorizontal: 28 },
+  container:    { paddingHorizontal: 28, paddingTop: 48, paddingBottom: 32 },
   title:        { fontSize: 30, fontWeight: '900', color: '#1a1a2e', textAlign: 'center', marginBottom: 40 },
   label:        { fontSize: 14, fontWeight: '700', color: '#1a1a2e', marginBottom: 8, marginTop: 18 },
   input:        { backgroundColor: '#F0F0F5', borderWidth: 2, borderColor: 'transparent', borderRadius: 14, padding: 15, fontSize: 15, color: '#1a1a2e' },

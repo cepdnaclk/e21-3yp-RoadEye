@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
 import Svg, { Path } from 'react-native-svg'
 
-import StatusBar     from '../components/shared/StatusBar'
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard   from '../components/dashboard/WeatherCard'
 import MusicPlayer   from '../components/dashboard/MusicPlayer'
@@ -31,18 +30,13 @@ export default function DashboardPage() {
 
   return (
     <View style={styles.screen}>
-      <StatusBar bg={C.white} />
       <DashboardHeader onLogout={logout} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-
         <WeatherCard />
         <MusicPlayer />
 
-        {/* Overview heading */}
         <SectionHeader title="Overview" />
-
-        {/* Odometer */}
         <View style={styles.odometerWrap}>
           <Svg width={180} height={110} viewBox="0 0 180 110">
             <Path d="M 20 100 A 50 50 0 0 1 160 100" fill="none" stroke="#E5E7EB" strokeWidth={10} strokeLinecap="round" />
@@ -56,7 +50,6 @@ export default function DashboardPage() {
           </View>
         </View>
 
-        {/* Highlights */}
         <SectionHeader title="Highlights" />
         <View style={styles.grid}>
           {highlights.map(h => (
@@ -71,7 +64,6 @@ export default function DashboardPage() {
           ))}
         </View>
 
-        {/* Weekly report */}
         <SectionHeader title="This week report" />
         <View style={styles.grid}>
           {weekStats.map(s => (
@@ -83,7 +75,6 @@ export default function DashboardPage() {
           ))}
         </View>
 
-        {/* Statistics */}
         <SectionHeader title="Statistics" />
         <StatsChart />
       </ScrollView>
@@ -103,24 +94,24 @@ function SectionHeader({ title }) {
 }
 
 const styles = StyleSheet.create({
-  screen:           { flex: 1, backgroundColor: C.bg },
-  scroll:           { paddingHorizontal: 16, paddingBottom: 20 },
-  odometerWrap:     { alignItems: 'center', marginBottom: 20, position: 'relative' },
-  odometerLabel:    { position: 'absolute', bottom: 10, alignItems: 'center' },
-  odometerVal:      { fontSize: 22, fontWeight: '800', color: '#1a1a2e' },
-  odometerBadge:    { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
-  odometerBadgeText:{ fontSize: 10, color: '#8892A4', fontWeight: '500' },
-  sectionHeader:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 4 },
-  sectionTitle:     { fontSize: 17, fontWeight: '800', color: C.text },
-  viewMore:         { fontSize: 12, color: C.muted, fontWeight: '500' },
-  grid:             { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-  highlightCard:    { flex: 1, minWidth: '45%', borderRadius: 16, padding: 14 },
-  highlightTop:     { flexDirection: 'row', justifyContent: 'space-between' },
-  highlightLabel:   { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
-  highlightIcon:    { fontSize: 20 },
-  highlightVal:     { fontSize: 22, fontWeight: '800', color: '#fff', marginVertical: 6 },
-  highlightSub:     { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
-  statCard:         { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
-  statLabel:        { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
-  statVal:          { fontSize: 22, fontWeight: '800', color: C.text },
+  screen:            { flex: 1, backgroundColor: C.bg },
+  scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
+  odometerWrap:      { alignItems: 'center', marginBottom: 20, position: 'relative' },
+  odometerLabel:     { position: 'absolute', bottom: 10, alignItems: 'center' },
+  odometerVal:       { fontSize: 22, fontWeight: '800', color: '#1a1a2e' },
+  odometerBadge:     { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
+  odometerBadgeText: { fontSize: 10, color: '#8892A4', fontWeight: '500' },
+  sectionHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 4 },
+  sectionTitle:      { fontSize: 17, fontWeight: '800', color: C.text },
+  viewMore:          { fontSize: 12, color: C.muted, fontWeight: '500' },
+  grid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
+  highlightCard:     { flex: 1, minWidth: '45%', borderRadius: 16, padding: 14 },
+  highlightTop:      { flexDirection: 'row', justifyContent: 'space-between' },
+  highlightLabel:    { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
+  highlightIcon:     { fontSize: 20 },
+  highlightVal:      { fontSize: 22, fontWeight: '800', color: '#fff', marginVertical: 6 },
+  highlightSub:      { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
+  statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
+  statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
+  statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
 })
