@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import Spotify, { ApiScope, SpotifyRemote } from 'react-native-spotify-remote'
+// import Spotify, { ApiScope, SpotifyRemote } from 'react-native-spotify-remote'
+const connectSpotify = async () => {
+  Alert.alert('Coming Soon', 'Spotify integration available in full build.')
+}
 
 const SPOTIFY_CONFIG = {
   clientID:        process.env.SPOTIFY_CLIENT_ID,
