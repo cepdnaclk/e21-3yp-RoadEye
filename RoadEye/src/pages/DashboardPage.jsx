@@ -4,8 +4,13 @@ import {
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
-import { colors } from '../../utils/theme'
+import { colors }  from '../utils/theme'
 
+import DashboardHeader   from '../components/dashboard/DashboardHeader'
+import WeatherCard       from '../components/dashboard/WeatherCard'
+import MusicPlayer       from '../components/dashboard/MusicPlayer'
+import StatsChart        from '../components/dashboard/StatsChart'
+import BottomNav         from '../components/dashboard/BottomNav'
 const C = colors
 
 export default function DashboardHeader({ onLogout }) {
