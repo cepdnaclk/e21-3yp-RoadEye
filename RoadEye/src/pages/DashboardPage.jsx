@@ -3,7 +3,7 @@ import {
   View, Text, TouchableOpacity, StyleSheet, Modal, Pressable
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
-import { useAuth } from '../../hooks/useAuth'
+import { useAuth } from '../hooks/useAuth'
 import { colors } from '../../utils/theme'
 
 const C = colors
