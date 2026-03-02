@@ -140,10 +140,10 @@ android {
         }
     }
     packagingOptions {
-        jniLibs {
-            useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
-        }
+    jniLibs {
+        useLegacyPackaging true
     }
+ }
 }
 
 // Apply static values from `gradle.properties` to the `android.packagingOptions`

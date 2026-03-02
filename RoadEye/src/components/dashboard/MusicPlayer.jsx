@@ -1,109 +1,102 @@
-import { useState, useEffect } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
+import { useState, useEffect, useRef } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Alert, AppState } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import Spotify, { ApiScope, SpotifyRemote } from 'react-native-spotify-remote'
-const connectSpotify = async () => {
-  Alert.alert('Coming Soon', 'Spotify integration available in full build.')
-}
+import { ApiScope, auth as SpotifyAuth, remote as SpotifyRemote } from 'react-native-spotify-remote'
 
 const SPOTIFY_CONFIG = {
-  clientID:        process.env.SPOTIFY_CLIENT_ID,
-  redirectURL:     'roadeye://callback',
-  tokenSwapURL:    process.env.SPOTIFY_TOKEN_SWAP_URL,
-  tokenRefreshURL: process.env.SPOTIFY_TOKEN_REFRESH_URL,
+  clientID:     '6a50dffacf9f4cd4a3ba9189a52059d2',
+  redirectURL:  'com.roadeye.app://callback',
   scopes: [
     ApiScope.AppRemoteControlScope,
     ApiScope.UserReadCurrentlyPlayingScope,
   ],
+  showDialog: false,
+}
+
+const formatTime = (ms) => {
+  const totalSec = Math.floor((ms || 0) / 1000)
+  const min = Math.floor(totalSec / 60)
+  const sec = totalSec % 60
+  return `${min}:${sec.toString().padStart(2, '0')}`
 }
 
 export default function MusicPlayer() {
-  const [isPlaying,  setIsPlaying]  = useState(false)
-  const [connected,  setConnected]  = useState(false)
-  const [trackName,  setTrackName]  = useState('Sway')
-  const [artist,     setArtist]     = useState('Michael Bublé')
-  const [progress,   setProgress]   = useState(0.54)   // 0.0 – 1.0
-  const [currentTime, setCurrentTime] = useState('1:42')
-  const [totalTime,  setTotalTime]  = useState('3:08')
+  const [isPlaying,   setIsPlaying]   = useState(false)
+  const [connected,   setConnected]   = useState(false)
+  const [connecting,  setConnecting]  = useState(false)
+  const [trackName,   setTrackName]   = useState(null)
+  const [artist,      setArtist]      = useState(null)
+  const [progress,    setProgress]    = useState(0)
+  const [currentTime, setCurrentTime] = useState('0:00')
+  const [totalTime,   setTotalTime]   = useState('0:00')
+  const listenerRef = useRef(null)
 
-  // ── Connect to Spotify ──────────────────────────────────────────────
+  const updateFromState = (state) => {
+    if (!state) return
+    setIsPlaying(!state.isPaused)
+    setTrackName(state.track?.name || 'Unknown')
+    setArtist(state.track?.artist?.name || 'Unknown')
+    const pos      = state.playbackPosition || 0
+    const duration = state.track?.duration  || 1
+    setProgress(pos / duration)
+    setCurrentTime(formatTime(pos))
+    setTotalTime(formatTime(duration))
+  }
+
   const connectSpotify = async () => {
+    if (connecting || connected) return
+    setConnecting(true)
     try {
-      const installed = await Linking.canOpenURL('spotify://')
-      if (!installed) {
-        Alert.alert(
-          'Spotify Not Found',
-          'Please install Spotify to use this feature.',
-          [
-            { text: 'Install', onPress: () => Linking.openURL('https://www.spotify.com/download') },
-            { text: 'Cancel' }
-          ]
-        )
-        return
-      }
-
-      const session = await Spotify.authorize(SPOTIFY_CONFIG)
+      const session = await SpotifyAuth.authorize(SPOTIFY_CONFIG)
       await SpotifyRemote.connect(session.accessToken)
       setConnected(true)
-
-      // Listen to player state changes
-      SpotifyRemote.addListener('playerStateChanged', (state) => {
-        setIsPlaying(!state.isPaused)
-        setTrackName(state.track?.name           || 'Unknown')
-        setArtist(state.track?.artist?.name      || 'Unknown')
-
-        // calculate progress
-        const pos      = state.playbackPosition  || 0
-        const duration = state.track?.duration   || 1
-        setProgress(pos / duration)
-
-        // format time
-        setCurrentTime(formatTime(pos))
-        setTotalTime(formatTime(duration))
-      })
-
+      const state = await SpotifyRemote.getPlayerState()
+      if (state) updateFromState(state)
+      listenerRef.current = SpotifyRemote.addListener('playerStateChanged', updateFromState)
     } catch (e) {
-      Alert.alert('Spotify Error', e.message)
+      Alert.alert('Spotify Error', e.message || 'Could not connect to Spotify.')
+    } finally {
+      setConnecting(false)
     }
   }
 
-  // ── Auto connect on mount ───────────────────────────────────────────
   useEffect(() => {
     connectSpotify()
     return () => {
-      SpotifyRemote.removeAllListeners('playerStateChanged')
-      SpotifyRemote.disconnect()
+      try {
+        if (listenerRef.current) listenerRef.current.remove()
+        SpotifyRemote.disconnect()
+      } catch (e) {}
     }
   }, [])
 
-  // ── Controls ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (appState) => {
+      if (appState === 'active' && !connected) connectSpotify()
+    })
+    return () => sub.remove()
+  }, [connected])
+
   const togglePlay = async () => {
     if (!connected) { connectSpotify(); return }
-    isPlaying
-      ? await SpotifyRemote.pausePlayback()
-      : await SpotifyRemote.resumePlayback()
-    setIsPlaying(!isPlaying)
+    try {
+      isPlaying
+        ? await SpotifyRemote.pausePlayback()
+        : await SpotifyRemote.resumePlayback()
+      setIsPlaying(!isPlaying)
+    } catch (e) {}
   }
 
   const skipNext = async () => {
     if (!connected) return
-    await SpotifyRemote.skipToNext()
+    try { await SpotifyRemote.skipToNext() } catch (e) {}
   }
 
   const skipPrev = async () => {
     if (!connected) return
-    await SpotifyRemote.skipToPrevious()
+    try { await SpotifyRemote.skipToPrevious() } catch (e) {}
   }
 
-  // ── Helper ──────────────────────────────────────────────────────────
-  const formatTime = (ms) => {
-    const totalSec = Math.floor(ms / 1000)
-    const min = Math.floor(totalSec / 60)
-    const sec = totalSec % 60
-    return `${min}:${sec.toString().padStart(2, '0')}`
-  }
-
-  // ── UI (unchanged) ──────────────────────────────────────────────────
   return (
     <LinearGradient
       colors={['#2d2d2d', '#1a1a2e']}
@@ -111,23 +104,25 @@ export default function MusicPlayer() {
       end={{ x: 1, y: 1 }}
       style={styles.card}
     >
-      {/* Track info */}
       <View style={styles.topRow}>
-        <View>
-          <Text style={styles.trackName}>{trackName}</Text>
-          <Text style={styles.artist}>{artist}</Text>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <Text style={styles.trackName} numberOfLines={1}>
+            {connecting ? 'Connecting to Spotify...' : trackName || 'Tap ▶ to connect Spotify'}
+          </Text>
+          <Text style={styles.artist} numberOfLines={1}>
+            {artist || 'No track playing'}
+          </Text>
         </View>
         <View style={styles.badges}>
           <View style={styles.helmetBadge}>
             <Text style={styles.helmetText}>🎧 Helmet Module</Text>
           </View>
           <Text style={[styles.spotifyText, connected && styles.spotifyConnected]}>
-            {connected ? '● SPOTIFY' : 'SPOTIFY'}
+            {connected ? '● SPOTIFY' : '○ SPOTIFY'}
           </Text>
         </View>
       </View>
 
-      {/* Progress bar */}
       <View style={styles.progressBg}>
         <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
       </View>
@@ -136,7 +131,6 @@ export default function MusicPlayer() {
         <Text style={styles.timeText}>{totalTime}</Text>
       </View>
 
-      {/* Controls */}
       <View style={styles.controls}>
         <TouchableOpacity style={styles.ctrlBtn} onPress={skipPrev}>
           <Text style={styles.ctrlIcon}>⏮</Text>
@@ -160,7 +154,7 @@ const styles = StyleSheet.create({
   badges:           { flexDirection: 'row', alignItems: 'center', gap: 6 },
   helmetBadge:      { backgroundColor: '#4F46E5', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   helmetText:       { fontSize: 10, fontWeight: '700', color: '#fff' },
-  spotifyText:      { fontSize: 10, color: '#4ade80', fontWeight: '700' },
+  spotifyText:      { fontSize: 10, color: '#6b7280', fontWeight: '700' },
   spotifyConnected: { color: '#1DB954' },
   progressBg:       { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 8 },
   progressFill:     { height: '100%', backgroundColor: '#fff', borderRadius: 99 },
