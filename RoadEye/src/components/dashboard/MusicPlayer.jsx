@@ -1,100 +1,40 @@
-import { useState, useEffect, useRef } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Alert, AppState } from 'react-native'
+import { useState } from 'react'
+import { View, Text, TouchableOpacity, StyleSheet, Linking, Alert } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { ApiScope, auth as SpotifyAuth, remote as SpotifyRemote } from 'react-native-spotify-remote'
-
-const SPOTIFY_CONFIG = {
-  clientID:     '6a50dffacf9f4cd4a3ba9189a52059d2',
-  redirectURL:  'com.roadeye.app://callback',
-  scopes: [
-    ApiScope.AppRemoteControlScope,
-    ApiScope.UserReadCurrentlyPlayingScope,
-  ],
-  showDialog: false,
-}
-
-const formatTime = (ms) => {
-  const totalSec = Math.floor((ms || 0) / 1000)
-  const min = Math.floor(totalSec / 60)
-  const sec = totalSec % 60
-  return `${min}:${sec.toString().padStart(2, '0')}`
-}
 
 export default function MusicPlayer() {
-  const [isPlaying,   setIsPlaying]   = useState(false)
-  const [connected,   setConnected]   = useState(false)
-  const [connecting,  setConnecting]  = useState(false)
-  const [trackName,   setTrackName]   = useState(null)
-  const [artist,      setArtist]      = useState(null)
-  const [progress,    setProgress]    = useState(0)
-  const [currentTime, setCurrentTime] = useState('0:00')
-  const [totalTime,   setTotalTime]   = useState('0:00')
-  const listenerRef = useRef(null)
+  const [activeTab, setActiveTab] = useState('spotify')
 
-  const updateFromState = (state) => {
-    if (!state) return
-    setIsPlaying(!state.isPaused)
-    setTrackName(state.track?.name || 'Unknown')
-    setArtist(state.track?.artist?.name || 'Unknown')
-    const pos      = state.playbackPosition || 0
-    const duration = state.track?.duration  || 1
-    setProgress(pos / duration)
-    setCurrentTime(formatTime(pos))
-    setTotalTime(formatTime(duration))
-  }
-
-  const connectSpotify = async () => {
-    if (connecting || connected) return
-    setConnecting(true)
+  const openSpotify = async () => {
     try {
-      const session = await SpotifyAuth.authorize(SPOTIFY_CONFIG)
-      await SpotifyRemote.connect(session.accessToken)
-      setConnected(true)
-      const state = await SpotifyRemote.getPlayerState()
-      if (state) updateFromState(state)
-      listenerRef.current = SpotifyRemote.addListener('playerStateChanged', updateFromState)
+      const canOpen = await Linking.canOpenURL('spotify://')
+      if (canOpen) {
+        await Linking.openURL('spotify://')
+      } else {
+        Alert.alert(
+          'Spotify Not Installed',
+          'Please install Spotify to use this feature.',
+          [
+            { text: 'Install', onPress: () => Linking.openURL('https://play.google.com/store/apps/details?id=com.spotify.music') },
+            { text: 'Cancel' }
+          ]
+        )
+      }
     } catch (e) {
-      Alert.alert('Spotify Error', e.message || 'Could not connect to Spotify.')
-    } finally {
-      setConnecting(false)
+      await Linking.openURL('https://open.spotify.com')
     }
   }
 
-  useEffect(() => {
-    connectSpotify()
-    return () => {
-      try {
-        if (listenerRef.current) listenerRef.current.remove()
-        SpotifyRemote.disconnect()
-      } catch (e) {}
-    }
-  }, [])
-
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (appState) => {
-      if (appState === 'active' && !connected) connectSpotify()
-    })
-    return () => sub.remove()
-  }, [connected])
-
-  const togglePlay = async () => {
-    if (!connected) { connectSpotify(); return }
+  const openYouTubeMusic = async () => {
     try {
-      isPlaying
-        ? await SpotifyRemote.pausePlayback()
-        : await SpotifyRemote.resumePlayback()
-      setIsPlaying(!isPlaying)
+      await Linking.openURL('https://music.youtube.com')
     } catch (e) {}
   }
 
-  const skipNext = async () => {
-    if (!connected) return
-    try { await SpotifyRemote.skipToNext() } catch (e) {}
-  }
-
-  const skipPrev = async () => {
-    if (!connected) return
-    try { await SpotifyRemote.skipToPrevious() } catch (e) {}
+  const openAppleMusic = async () => {
+    try {
+      await Linking.openURL('https://music.apple.com')
+    } catch (e) {}
   }
 
   return (
@@ -104,65 +44,91 @@ export default function MusicPlayer() {
       end={{ x: 1, y: 1 }}
       style={styles.card}
     >
-      <View style={styles.topRow}>
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={styles.trackName} numberOfLines={1}>
-            {connecting ? 'Connecting to Spotify...' : trackName || 'Tap ▶ to connect Spotify'}
-          </Text>
-          <Text style={styles.artist} numberOfLines={1}>
-            {artist || 'No track playing'}
-          </Text>
-        </View>
-        <View style={styles.badges}>
-          <View style={styles.helmetBadge}>
-            <Text style={styles.helmetText}>🎧 Helmet Module</Text>
-          </View>
-          <Text style={[styles.spotifyText, connected && styles.spotifyConnected]}>
-            {connected ? '● SPOTIFY' : '○ SPOTIFY'}
-          </Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>🎧 Music Player</Text>
+        <View style={styles.helmetBadge}>
+          <Text style={styles.helmetText}>Helmet Module</Text>
         </View>
       </View>
 
-      <View style={styles.progressBg}>
-        <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-      </View>
-      <View style={styles.timeRow}>
-        <Text style={styles.timeText}>{currentTime}</Text>
-        <Text style={styles.timeText}>{totalTime}</Text>
+      {/* Tab bar */}
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'spotify' && styles.tabActive]}
+          onPress={() => setActiveTab('spotify')}
+        >
+          <Text style={[styles.tabText, activeTab === 'spotify' && styles.tabTextActive]}>Spotify</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'youtube' && styles.tabActive]}
+          onPress={() => setActiveTab('youtube')}
+        >
+          <Text style={[styles.tabText, activeTab === 'youtube' && styles.tabTextActive]}>YouTube Music</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'apple' && styles.tabActive]}
+          onPress={() => setActiveTab('apple')}
+        >
+          <Text style={[styles.tabText, activeTab === 'apple' && styles.tabTextActive]}>Apple Music</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.controls}>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={skipPrev}>
-          <Text style={styles.ctrlIcon}>⏮</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={togglePlay} style={styles.playBtn}>
-          <Text style={styles.playIcon}>{isPlaying ? '⏸' : '▶'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.ctrlBtn} onPress={skipNext}>
-          <Text style={styles.ctrlIcon}>⏭</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Content */}
+      {activeTab === 'spotify' && (
+        <View style={styles.content}>
+          <Text style={styles.serviceIcon}>🟢</Text>
+          <Text style={styles.serviceName}>Spotify</Text>
+          <Text style={styles.serviceDesc}>Stream millions of songs and podcasts</Text>
+          <TouchableOpacity style={[styles.openBtn, styles.spotifyBtn]} onPress={openSpotify}>
+            <Text style={styles.openBtnText}>Open Spotify</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {activeTab === 'youtube' && (
+        <View style={styles.content}>
+          <Text style={styles.serviceIcon}>🔴</Text>
+          <Text style={styles.serviceName}>YouTube Music</Text>
+          <Text style={styles.serviceDesc}>Music and videos from YouTube</Text>
+          <TouchableOpacity style={[styles.openBtn, styles.youtubeBtn]} onPress={openYouTubeMusic}>
+            <Text style={styles.openBtnText}>Open YouTube Music</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {activeTab === 'apple' && (
+        <View style={styles.content}>
+          <Text style={styles.serviceIcon}>🎵</Text>
+          <Text style={styles.serviceName}>Apple Music</Text>
+          <Text style={styles.serviceDesc}>Your entire music library, ad-free</Text>
+          <TouchableOpacity style={[styles.openBtn, styles.appleBtn]} onPress={openAppleMusic}>
+            <Text style={styles.openBtnText}>Open Apple Music</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </LinearGradient>
   )
 }
 
 const styles = StyleSheet.create({
-  card:             { borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
-  topRow:           { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 },
-  trackName:        { fontSize: 17, fontWeight: '800', color: '#fff' },
-  artist:           { fontSize: 12, color: '#9ca3af' },
-  badges:           { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  helmetBadge:      { backgroundColor: '#4F46E5', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
-  helmetText:       { fontSize: 10, fontWeight: '700', color: '#fff' },
-  spotifyText:      { fontSize: 10, color: '#6b7280', fontWeight: '700' },
-  spotifyConnected: { color: '#1DB954' },
-  progressBg:       { backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 99, height: 3, marginBottom: 8 },
-  progressFill:     { height: '100%', backgroundColor: '#fff', borderRadius: 99 },
-  timeRow:          { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  timeText:         { fontSize: 10, color: '#9ca3af' },
-  controls:         { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 24 },
-  ctrlBtn:          { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 18, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
-  ctrlIcon:         { fontSize: 14 },
-  playBtn:          { backgroundColor: '#fff', borderRadius: 22, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  playIcon:         { fontSize: 16 },
+  card:            { borderRadius: 16, padding: 16, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 6 },
+  header:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  title:           { fontSize: 16, fontWeight: '800', color: '#fff' },
+  helmetBadge:     { backgroundColor: '#4F46E5', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  helmetText:      { fontSize: 10, fontWeight: '700', color: '#fff' },
+  tabBar:          { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, marginBottom: 16 },
+  tab:             { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8 },
+  tabActive:       { backgroundColor: 'rgba(255,255,255,0.2)' },
+  tabText:         { fontSize: 11, color: '#9ca3af', fontWeight: '600' },
+  tabTextActive:   { color: '#fff' },
+  content:         { alignItems: 'center', paddingVertical: 12 },
+  serviceIcon:     { fontSize: 36, marginBottom: 8 },
+  serviceName:     { fontSize: 18, fontWeight: '800', color: '#fff', marginBottom: 6 },
+  serviceDesc:     { fontSize: 12, color: '#9ca3af', marginBottom: 16, textAlign: 'center' },
+  openBtn:         { paddingHorizontal: 32, paddingVertical: 12, borderRadius: 25 },
+  spotifyBtn:      { backgroundColor: '#1DB954' },
+  youtubeBtn:      { backgroundColor: '#FF0000' },
+  appleBtn:        { backgroundColor: '#fc3c44' },
+  openBtnText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
 })
