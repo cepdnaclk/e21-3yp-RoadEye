@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
 import Svg, { Path } from 'react-native-svg'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard     from '../components/dashboard/WeatherCard'
@@ -25,11 +26,12 @@ const weekStats = [
 ]
 
 export default function DashboardPage() {
+  const insets      = useSafeAreaInsets()  // ← added
   const { logout }  = useAuth()
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>  {/* ← changed */}
       <DashboardHeader onLogout={logout} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
