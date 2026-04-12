@@ -40,9 +40,13 @@
     },
     "plugins": [
       "expo-location",
-      ["expo-contacts", {
-        "contactsPermission": "Allow RoadEye to access your contacts for emergency settings."
-      }]
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow RoadEye to access your contacts for emergency settings."
+        }
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

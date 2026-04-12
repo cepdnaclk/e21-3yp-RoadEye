@@ -1,19 +1,59 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Switch, Alert, Modal, FlatList,
   TextInput, Linking, Platform
 } from 'react-native'
 import * as Contacts from 'expo-contacts'
+import * as SecureStore from 'expo-secure-store'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../utils/theme'
 
 const C = colors
 
+const KEY_CONTACTS = 'emergency_contacts'
+const KEY_MESSAGE  = 'emergency_custom_message'
+
+// SecureStore has a 2048 byte value limit — store as base64-safe JSON
+// FIX: save() now returns a boolean so callers know if it succeeded
+const save = async (key, value) => {
+  try {
+    const serialized = JSON.stringify(value)
+    // FIX: guard against exceeding SecureStore's 2048-byte limit
+    if (serialized.length > 2000) {
+      console.warn(`SecureStore save [${key}]: value too large (${serialized.length} bytes)`)
+      return false
+    }
+    await SecureStore.setItemAsync(key, serialized)
+    return true
+  } catch (e) {
+    console.error(`SecureStore save [${key}]:`, e)
+    return false
+  }
+}
+
+const load = async (key) => {
+  try {
+    const raw = await SecureStore.getItemAsync(key)
+    return raw ? JSON.parse(raw) : null
+  } catch (e) {
+    console.error(`SecureStore load [${key}]:`, e)
+    return null
+  }
+}
+
+const remove = async (key) => {
+  try {
+    await SecureStore.deleteItemAsync(key)
+  } catch (e) {
+    console.error(`SecureStore remove [${key}]:`, e)
+  }
+}
+
 export default function EmergencyPage() {
   const insets = useSafeAreaInsets()
 
-  // ── Start empty — no dummy contacts ────────────────────────────────
+  // ── State ───────────────────────────────────────────────────────────
   const [emergencyContacts, setEmergencyContacts] = useState([])
   const [sendDefault,      setSendDefault]      = useState(true)
   const [sendAlerts,       setSendAlerts]        = useState(true)
@@ -33,39 +73,89 @@ export default function EmergencyPage() {
   const [isEditingMessage, setIsEditingMessage] = useState(false)
   const [customMessage,    setCustomMessage]    = useState('')
   const [savedMessage,     setSavedMessage]     = useState('')
+  // FIX: track inline warning for empty message save attempt
+  const [messageError,     setMessageError]     = useState('')
 
   const defaultMessage = `🚨 EMERGENCY ALERT!!\n\nYour friend/child ${userName} is in an emergency situation. Please reach him/her immediately.`
   const activeMessage  = savedMessage || defaultMessage
 
+  // ── Load persisted data on mount ────────────────────────────────────
+  useEffect(() => {
+    const loadPersistedData = async () => {
+      try {
+        const [contacts, message] = await Promise.all([
+          load(KEY_CONTACTS),
+          load(KEY_MESSAGE),
+        ])
+        if (contacts) setEmergencyContacts(contacts)
+        if (message)  setSavedMessage(message)
+      } catch (e) {
+        // Non-fatal — app works fine with empty defaults
+        console.error('Failed to load persisted data:', e)
+      }
+    }
+    loadPersistedData()
+  }, [])
+
   // ── Load phone contacts ─────────────────────────────────────────────
+  // FIX: entire function wrapped in try/catch/finally so loadingConts
+  // always resets, permission denial offers "Open Settings", and API
+  // errors show a user-visible message instead of silently hanging.
   const loadContacts = async () => {
     setLoadingConts(true)
-    const { status } = await Contacts.requestPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission Denied', 'Please allow contacts access to add emergency contacts.')
+    try {
+      const { status } = await Contacts.requestPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Denied',
+          'Please allow contacts access to add emergency contacts.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        )
+        return
+      }
+
+      const { data } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+      })
+
+      if (!data || data.length === 0) {
+        Alert.alert('No Contacts', 'No contacts with phone numbers were found on this device.')
+        return
+      }
+
+      const filtered = data
+        .filter(c => c.name && c.phoneNumbers?.length > 0)
+        .map((c, i) => ({ ...c, id: c.id ?? `contact_${i}_${Date.now()}` }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      setAllContacts(filtered)
+      setShowPicker(true)
+    } catch (err) {
+      console.error('loadContacts error:', err)
+      Alert.alert(
+        'Could Not Load Contacts',
+        'Please check that the app has contacts permission and try again.',
+        [
+          { text: 'OK', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() },
+        ]
+      )
+    } finally {
+      // FIX: always resets loading state, even if an error is thrown
       setLoadingConts(false)
-      return
     }
-    const { data } = await Contacts.getContactsAsync({
-      fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-    })
-    const filtered = data
-      .filter(c => c.name && c.phoneNumbers?.length > 0)
-      .map((c, i) => ({ ...c, id: c.id ?? `contact_${i}_${Date.now()}` })) // ensure every contact has an id
-      .sort((a, b) => a.name.localeCompare(b.name))
-    setAllContacts(filtered)
-    setLoadingConts(false)
-    setShowPicker(true)
   }
 
   // ── Add contact ─────────────────────────────────────────────────────
-  const handleSelectContact = (contact) => {
+  const handleSelectContact = async (contact) => {
     if (emergencyContacts.length >= 5) {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
       return
     }
     const phone = contact.phoneNumbers?.[0]?.number || ''
-    // Check duplicate by id OR phone number
     const already = emergencyContacts.find(
       c => c.id === contact.id || (phone && c.phone === phone)
     )
@@ -73,14 +163,19 @@ export default function EmergencyPage() {
       Alert.alert('Already Added', `${contact.name} is already in your emergency contacts.`)
       return
     }
-    setEmergencyContacts(prev => [
-      ...prev,
-      {
-        id: contact.id ?? `${Date.now()}`,
-        name: contact.name,
-        phone,
-      }
-    ])
+    const updated = [
+      ...emergencyContacts,
+      { id: contact.id ?? `${Date.now()}`, name: contact.name, phone },
+    ]
+
+    // FIX: check if save succeeded before updating UI
+    const saved = await save(KEY_CONTACTS, updated)
+    if (!saved) {
+      Alert.alert('Save Failed', 'Could not save this contact. Your contacts list may be full or storage is unavailable.')
+      return
+    }
+
+    setEmergencyContacts(updated)
     setShowPicker(false)
     setSearchQuery('')
   }
@@ -92,14 +187,54 @@ export default function EmergencyPage() {
       'Remove this emergency contact?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () =>
-          setEmergencyContacts(prev => prev.filter(c => c.id !== id))
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            const updated = emergencyContacts.filter(c => c.id !== id)
+            setEmergencyContacts(updated)
+            // FIX: save after optimistic update; restore on failure
+            const saved = await save(KEY_CONTACTS, updated)
+            if (!saved) {
+              setEmergencyContacts(emergencyContacts) // rollback
+              Alert.alert('Error', 'Could not remove contact. Please try again.')
+            }
+          },
         },
       ]
     )
   }
 
-  // ── TEST: Send emergency SMS to all contacts via Linking ─────────────
+  // ── Save / reset custom message ─────────────────────────────────────
+  const handleSaveMessage = async () => {
+    // FIX: show inline warning instead of silently discarding empty input
+    if (!customMessage.trim()) {
+      setMessageError('Message cannot be empty.')
+      return
+    }
+    setMessageError('')
+    const msg = customMessage.trim()
+
+    const saved = await save(KEY_MESSAGE, msg)
+    if (!saved) {
+      Alert.alert('Save Failed', 'Could not save your message. Please try again.')
+      return
+    }
+
+    setSavedMessage(msg)
+    Alert.alert('Saved!', 'Your custom emergency message has been saved.')
+    setIsEditingMessage(false)
+  }
+
+  const handleResetMessage = () => {
+    setSavedMessage('')
+    setCustomMessage(defaultMessage)
+    setMessageError('')
+    remove(KEY_MESSAGE)
+    setIsEditingMessage(false)
+  }
+
+  // ── Send emergency SMS to all contacts via Linking ───────────────────
   const handleTestSend = async () => {
     const contactsWithPhone = emergencyContacts.filter(c => c.phone && c.phone.trim() !== '')
 
@@ -126,6 +261,8 @@ export default function EmergencyPage() {
           style: 'destructive',
           onPress: async () => {
             setSending(true)
+            let successCount = 0
+            const failed = []
             try {
               for (const contact of contactsWithPhone) {
                 const phone = contact.phone.replace(/\s/g, '')
@@ -133,19 +270,29 @@ export default function EmergencyPage() {
                   ? `smsto:${phone}?body=${encodeURIComponent(activeMessage)}`
                   : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
 
-                const canOpen = await Linking.canOpenURL(smsUrl)
-                if (canOpen) {
+                try {
+                  // FIX: openURL wrapped in its own try/catch — canOpenURL
+                  // is unreliable on Android and can return true even when
+                  // the URL fails to open.
                   await Linking.openURL(smsUrl)
+                  successCount++
                   await new Promise(res => setTimeout(res, 1500))
-                } else {
-                  Alert.alert('Error', `Cannot open SMS for ${contact.name}`)
+                } catch (linkErr) {
+                  console.error(`SMS error for ${contact.name}:`, linkErr)
+                  failed.push(contact.name)
                 }
               }
-            } catch (err) {
-              Alert.alert('Error', 'Failed to send message. Please try again.')
-              console.error('SMS error:', err)
             } finally {
               setSending(false)
+              // FIX: always show outcome, success or partial failure
+              if (failed.length === 0) {
+                Alert.alert('Done', `SMS opened for ${successCount} contact(s).`)
+              } else {
+                Alert.alert(
+                  'Partially Sent',
+                  `Sent to ${successCount} contact(s).\nCould not open SMS for: ${failed.join(', ')}`
+                )
+              }
             }
           },
         },
@@ -221,7 +368,6 @@ export default function EmergencyPage() {
 
                 <View style={styles.contactsRow}>
 
-                  {/* Empty state */}
                   {emergencyContacts.length === 0 && (
                     <Text style={styles.emptyText}>No contacts added yet.</Text>
                   )}
@@ -245,7 +391,6 @@ export default function EmergencyPage() {
                     </TouchableOpacity>
                   ))}
 
-                  {/* Add button — only show if under limit */}
                   {emergencyContacts.length < 5 && (
                     <TouchableOpacity onPress={loadContacts} style={styles.contactItem}>
                       <View style={styles.addContactBtn}>
@@ -306,6 +451,7 @@ export default function EmergencyPage() {
                           style={styles.editMsgBtn}
                           onPress={() => {
                             setCustomMessage(savedMessage || defaultMessage)
+                            setMessageError('')
                             setIsEditingMessage(true)
                           }}
                         >
@@ -315,40 +461,37 @@ export default function EmergencyPage() {
                     ) : (
                       <View style={styles.editMsgArea}>
                         <TextInput
-                          style={styles.msgInput}
+                          style={[styles.msgInput, messageError ? styles.msgInputError : null]}
                           value={customMessage}
-                          onChangeText={setCustomMessage}
+                          onChangeText={(text) => {
+                            setCustomMessage(text)
+                            if (messageError) setMessageError('')
+                          }}
                           multiline
                           textAlignVertical="top"
                           placeholderTextColor="#9CA3AF"
                           autoFocus
                         />
+                        {/* FIX: inline error instead of silently discarding empty input */}
+                        {messageError ? (
+                          <Text style={styles.msgErrorText}>{messageError}</Text>
+                        ) : null}
                         <View style={styles.editMsgActions}>
                           <TouchableOpacity
                             style={styles.resetBtn}
-                            onPress={() => {
-                              setSavedMessage('')
-                              setCustomMessage(defaultMessage)
-                              setIsEditingMessage(false)
-                            }}
+                            onPress={handleResetMessage}
                           >
                             <Text style={styles.resetBtnText}>↩ Reset</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.cancelBtn}
-                            onPress={() => setIsEditingMessage(false)}
+                            onPress={() => { setIsEditingMessage(false); setMessageError('') }}
                           >
                             <Text style={styles.cancelBtnText}>Cancel</Text>
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.saveMsgBtn}
-                            onPress={() => {
-                              if (customMessage.trim()) {
-                                setSavedMessage(customMessage.trim())
-                                Alert.alert('Saved!', 'Your custom emergency message has been saved.')
-                              }
-                              setIsEditingMessage(false)
-                            }}
+                            onPress={handleSaveMessage}
                           >
                             <Text style={styles.saveMsgBtnText}>💾 Save</Text>
                           </TouchableOpacity>
@@ -509,6 +652,8 @@ const styles = StyleSheet.create({
   editMsgBtnText:      { fontSize: 12, color: C.primary, fontWeight: '700' },
   editMsgArea:         { marginTop: 4 },
   msgInput:            { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#DDD6FE', borderRadius: 10, padding: 12, fontSize: 13, color: '#1a1a2e', minHeight: 100, lineHeight: 20 },
+  msgInputError:       { borderColor: '#EF4444' },
+  msgErrorText:        { fontSize: 11, color: '#EF4444', marginTop: 4 },
   editMsgActions:      { flexDirection: 'row', gap: 8, marginTop: 10, justifyContent: 'flex-end', alignItems: 'center' },
   resetBtn:            { paddingHorizontal: 10, paddingVertical: 7, borderRadius: 8, backgroundColor: '#F3F4F6' },
   resetBtnText:        { fontSize: 12, color: '#6B7280', fontWeight: '600' },
