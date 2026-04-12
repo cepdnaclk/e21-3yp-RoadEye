@@ -2,10 +2,9 @@ import { useState } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Switch, Alert, Modal, FlatList,
-  TextInput, Linking
+  TextInput, Linking, Platform
 } from 'react-native'
 import * as Contacts from 'expo-contacts'
-import * as SMS from 'expo-sms'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../utils/theme'
 
@@ -92,21 +91,21 @@ export default function EmergencyPage() {
     )
   }
 
-  // ── TEST: Send emergency SMS to all contacts ─────────────────────────
+  // ── TEST: Send emergency SMS to all contacts via Linking ─────────────
   const handleTestSend = async () => {
-    // Check there are contacts with phone numbers
     const contactsWithPhone = emergencyContacts.filter(c => c.phone && c.phone.trim() !== '')
+
     if (contactsWithPhone.length === 0) {
       Alert.alert(
         'No Phone Numbers',
-        'Your emergency contacts don\'t have phone numbers. Please remove and re-add them from your contact list to include their numbers.',
+        "Your emergency contacts don't have phone numbers. Remove and re-add them from your contact list."
       )
       return
     }
 
     Alert.alert(
       '🚨 Test Emergency Message',
-      `This will send the emergency message to ${contactsWithPhone.length} contact(s):\n\n${contactsWithPhone.map(c => `• ${c.name} (${c.phone})`).join('\n')}\n\nProceed?`,
+      `This will open SMS for ${contactsWithPhone.length} contact(s):\n\n${contactsWithPhone.map(c => `• ${c.name} (${c.phone})`).join('\n')}\n\nProceed?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -115,26 +114,20 @@ export default function EmergencyPage() {
           onPress: async () => {
             setSending(true)
             try {
-              const isAvailable = await SMS.isAvailableAsync()
+              for (const contact of contactsWithPhone) {
+                const phone = contact.phone.replace(/\s/g, '')
+                // Android uses "smsto:", iOS uses "sms:"
+                const smsUrl = Platform.OS === 'android'
+                  ? `smsto:${phone}?body=${encodeURIComponent(activeMessage)}`
+                  : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
 
-              if (isAvailable) {
-                // Send to all contacts at once
-                const phoneNumbers = contactsWithPhone.map(c => c.phone)
-                const { result } = await SMS.sendSMSAsync(phoneNumbers, activeMessage)
-                if (result === 'sent') {
-                  Alert.alert('✅ Sent!', 'Emergency message was sent successfully.')
-                } else if (result === 'cancelled') {
-                  Alert.alert('Cancelled', 'Message sending was cancelled.')
-                }
-              } else {
-                // Fallback: open SMS app via deep link for first contact
-                const phone = contactsWithPhone[0].phone.replace(/\D/g, '')
-                const smsUrl = `sms:${phone}?body=${encodeURIComponent(activeMessage)}`
                 const canOpen = await Linking.canOpenURL(smsUrl)
                 if (canOpen) {
                   await Linking.openURL(smsUrl)
+                  // Small delay so SMS app can open before next contact
+                  await new Promise(res => setTimeout(res, 1500))
                 } else {
-                  Alert.alert('Not Supported', 'SMS is not available on this device.')
+                  Alert.alert('Error', `Cannot open SMS for ${contact.name}`)
                 }
               }
             } catch (err) {
@@ -228,12 +221,10 @@ export default function EmergencyPage() {
                         </Text>
                       </View>
                       <Text style={styles.contactName} numberOfLines={1}>{c.name}</Text>
-                      {/* Show phone indicator */}
-                      {c.phone ? (
-                        <Text style={styles.phoneIndicator}>📱</Text>
-                      ) : (
-                        <Text style={styles.noPhoneIndicator}>⚠️</Text>
-                      )}
+                      {c.phone
+                        ? <Text style={styles.phoneIndicator}>📱</Text>
+                        : <Text style={styles.noPhoneIndicator}>⚠️</Text>
+                      }
                     </TouchableOpacity>
                   ))}
 
