@@ -12,6 +12,7 @@
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "expo": "~51.0.0",
+    "expo-contacts": "~13.0.5",
     "expo-dev-client": "~4.0.29",
     "expo-linear-gradient": "~13.0.2",
     "expo-location": "~17.0.1",
