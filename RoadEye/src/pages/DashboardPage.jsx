@@ -31,7 +31,7 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>  {/* ← changed */}
+    <View style={[styles.screen, { paddingTop: insets.top }]}> 
       <DashboardHeader onLogout={logout} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
