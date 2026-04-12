@@ -13,11 +13,8 @@ const C = colors
 export default function EmergencyPage() {
   const insets = useSafeAreaInsets()
 
-  const [emergencyContacts, setEmergencyContacts] = useState([
-    { id: '1', name: 'Mom',    phone: '' },
-    { id: '2', name: 'Dad',    phone: '' },
-    { id: '3', name: 'Peachy', phone: '' },
-  ])
+  // ── Start empty — no dummy contacts ────────────────────────────────
+  const [emergencyContacts, setEmergencyContacts] = useState([])
   const [sendDefault,      setSendDefault]      = useState(true)
   const [sendAlerts,       setSendAlerts]        = useState(true)
   const [showPicker,       setShowPicker]        = useState(false)
@@ -54,6 +51,7 @@ export default function EmergencyPage() {
     })
     const filtered = data
       .filter(c => c.name && c.phoneNumbers?.length > 0)
+      .map((c, i) => ({ ...c, id: c.id ?? `contact_${i}_${Date.now()}` })) // ensure every contact has an id
       .sort((a, b) => a.name.localeCompare(b.name))
     setAllContacts(filtered)
     setLoadingConts(false)
@@ -66,13 +64,23 @@ export default function EmergencyPage() {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
       return
     }
-    const already = emergencyContacts.find(c => c.id === contact.id)
+    const phone = contact.phoneNumbers?.[0]?.number || ''
+    // Check duplicate by id OR phone number
+    const already = emergencyContacts.find(
+      c => c.id === contact.id || (phone && c.phone === phone)
+    )
     if (already) {
       Alert.alert('Already Added', `${contact.name} is already in your emergency contacts.`)
       return
     }
-    const phone = contact.phoneNumbers?.[0]?.number || ''
-    setEmergencyContacts(prev => [...prev, { id: contact.id, name: contact.name, phone }])
+    setEmergencyContacts(prev => [
+      ...prev,
+      {
+        id: contact.id ?? `${Date.now()}`,
+        name: contact.name,
+        phone,
+      }
+    ])
     setShowPicker(false)
     setSearchQuery('')
   }
@@ -95,6 +103,11 @@ export default function EmergencyPage() {
   const handleTestSend = async () => {
     const contactsWithPhone = emergencyContacts.filter(c => c.phone && c.phone.trim() !== '')
 
+    if (emergencyContacts.length === 0) {
+      Alert.alert('No Contacts', 'Please add at least one emergency contact first.')
+      return
+    }
+
     if (contactsWithPhone.length === 0) {
       Alert.alert(
         'No Phone Numbers',
@@ -116,7 +129,6 @@ export default function EmergencyPage() {
             try {
               for (const contact of contactsWithPhone) {
                 const phone = contact.phone.replace(/\s/g, '')
-                // Android uses "smsto:", iOS uses "sms:"
                 const smsUrl = Platform.OS === 'android'
                   ? `smsto:${phone}?body=${encodeURIComponent(activeMessage)}`
                   : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
@@ -124,7 +136,6 @@ export default function EmergencyPage() {
                 const canOpen = await Linking.canOpenURL(smsUrl)
                 if (canOpen) {
                   await Linking.openURL(smsUrl)
-                  // Small delay so SMS app can open before next contact
                   await new Promise(res => setTimeout(res, 1500))
                 } else {
                   Alert.alert('Error', `Cannot open SMS for ${contact.name}`)
@@ -209,6 +220,12 @@ export default function EmergencyPage() {
                 </Text>
 
                 <View style={styles.contactsRow}>
+
+                  {/* Empty state */}
+                  {emergencyContacts.length === 0 && (
+                    <Text style={styles.emptyText}>No contacts added yet.</Text>
+                  )}
+
                   {emergencyContacts.map((c, i) => (
                     <TouchableOpacity
                       key={c.id}
@@ -409,7 +426,7 @@ export default function EmergencyPage() {
           ) : (
             <FlatList
               data={filteredContacts}
-              keyExtractor={item => item.id}
+              keyExtractor={(item, index) => item.id ?? `${index}`}
               renderItem={({ item, index }) => (
                 <TouchableOpacity
                   style={styles.contactListItem}
@@ -472,6 +489,7 @@ const styles = StyleSheet.create({
   contactName:         { fontSize: 11, color: '#4B5563', fontWeight: '500', textAlign: 'center' },
   phoneIndicator:      { fontSize: 9, marginTop: 2 },
   noPhoneIndicator:    { fontSize: 9, marginTop: 2 },
+  emptyText:           { fontSize: 12, color: '#9CA3AF', fontStyle: 'italic', marginBottom: 12, width: '100%' },
   addContactBtn:       { width: 48, height: 48, borderRadius: 24, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 4, borderWidth: 2, borderColor: '#DDD6FE', borderStyle: 'dashed' },
   addContactIcon:      { fontSize: 24, color: C.primary, fontWeight: '300' },
   hintText:            { fontSize: 10, color: '#9CA3AF', marginTop: 4 },
