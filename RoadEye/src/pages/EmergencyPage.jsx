@@ -14,12 +14,9 @@ const C = colors
 const KEY_CONTACTS = 'emergency_contacts'
 const KEY_MESSAGE  = 'emergency_custom_message'
 
-// SecureStore has a 2048 byte value limit — store as base64-safe JSON
-// FIX: save() now returns a boolean so callers know if it succeeded
 const save = async (key, value) => {
   try {
     const serialized = JSON.stringify(value)
-    // FIX: guard against exceeding SecureStore's 2048-byte limit
     if (serialized.length > 2000) {
       console.warn(`SecureStore save [${key}]: value too large (${serialized.length} bytes)`)
       return false
@@ -63,17 +60,16 @@ export default function EmergencyPage() {
   const [loadingConts,     setLoadingConts]      = useState(false)
   const [sending,          setSending]           = useState(false)
 
-  // ── Dropdown state ─────────────────────────────────────────────────
-  const [detailsOpen,  setDetailsOpen]  = useState(false)
+  // ── Dropdown state — detailsOpen is TRUE so contacts are visible by default ──
+  const [detailsOpen,  setDetailsOpen]  = useState(true)   // FIX: was false
   const [contactsOpen, setContactsOpen] = useState(true)
   const [messagesOpen, setMessagesOpen] = useState(true)
 
   // ── Emergency message state ─────────────────────────────────────────
-  const userName           = 'Alex' // Replace with actual user name
+  const userName           = 'Alex'
   const [isEditingMessage, setIsEditingMessage] = useState(false)
   const [customMessage,    setCustomMessage]    = useState('')
   const [savedMessage,     setSavedMessage]     = useState('')
-  // FIX: track inline warning for empty message save attempt
   const [messageError,     setMessageError]     = useState('')
 
   const defaultMessage = `🚨 EMERGENCY ALERT!!\n\nYour friend/child ${userName} is in an emergency situation. Please reach him/her immediately.`
@@ -90,7 +86,6 @@ export default function EmergencyPage() {
         if (contacts) setEmergencyContacts(contacts)
         if (message)  setSavedMessage(message)
       } catch (e) {
-        // Non-fatal — app works fine with empty defaults
         console.error('Failed to load persisted data:', e)
       }
     }
@@ -98,38 +93,52 @@ export default function EmergencyPage() {
   }, [])
 
   // ── Load phone contacts ─────────────────────────────────────────────
-  // FIX: entire function wrapped in try/catch/finally so loadingConts
-  // always resets, permission denial offers "Open Settings", and API
-  // errors show a user-visible message instead of silently hanging.
   const loadContacts = async () => {
+    console.log('=== loadContacts called ===')
     setLoadingConts(true)
+    console.log('=== requesting permission now ===')   // DEBUG: confirms we reached permission step
     try {
-      const { status } = await Contacts.requestPermissionsAsync()
+      const { status, canAskAgain } = await Contacts.requestPermissionsAsync()
+      console.log('permission status:', status, '| canAskAgain:', canAskAgain)  // DEBUG: if this never prints, permission is hanging → need npx expo run:android
+
       if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Please allow contacts access to add emergency contacts.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Open Settings', onPress: () => Linking.openSettings() },
-          ]
-        )
+        if (!canAskAgain) {
+          Alert.alert(
+            'Permission Blocked',
+            'Contacts permission was permanently denied. Please enable it in your phone Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
+          )
+        } else {
+          Alert.alert(
+            'Permission Denied',
+            'Please allow contacts access to add emergency contacts.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ]
+          )
+        }
         return
       }
 
       const { data } = await Contacts.getContactsAsync({
         fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
       })
+      console.log('total contacts fetched:', data?.length ?? 0)
 
-      if (!data || data.length === 0) {
-        Alert.alert('No Contacts', 'No contacts with phone numbers were found on this device.')
-        return
-      }
-
-      const filtered = data
+      const filtered = (data || [])
         .filter(c => c.name && c.phoneNumbers?.length > 0)
         .map((c, i) => ({ ...c, id: c.id ?? `contact_${i}_${Date.now()}` }))
         .sort((a, b) => a.name.localeCompare(b.name))
+      console.log('filtered contacts with phone numbers:', filtered.length)
+
+      if (filtered.length === 0) {
+        Alert.alert('No Contacts Found', 'No contacts with phone numbers were found on this device.')
+        return
+      }
 
       setAllContacts(filtered)
       setShowPicker(true)
@@ -144,7 +153,6 @@ export default function EmergencyPage() {
         ]
       )
     } finally {
-      // FIX: always resets loading state, even if an error is thrown
       setLoadingConts(false)
     }
   }
@@ -168,7 +176,6 @@ export default function EmergencyPage() {
       { id: contact.id ?? `${Date.now()}`, name: contact.name, phone },
     ]
 
-    // FIX: check if save succeeded before updating UI
     const saved = await save(KEY_CONTACTS, updated)
     if (!saved) {
       Alert.alert('Save Failed', 'Could not save this contact. Your contacts list may be full or storage is unavailable.')
@@ -193,10 +200,9 @@ export default function EmergencyPage() {
           onPress: async () => {
             const updated = emergencyContacts.filter(c => c.id !== id)
             setEmergencyContacts(updated)
-            // FIX: save after optimistic update; restore on failure
             const saved = await save(KEY_CONTACTS, updated)
             if (!saved) {
-              setEmergencyContacts(emergencyContacts) // rollback
+              setEmergencyContacts(emergencyContacts)
               Alert.alert('Error', 'Could not remove contact. Please try again.')
             }
           },
@@ -207,7 +213,6 @@ export default function EmergencyPage() {
 
   // ── Save / reset custom message ─────────────────────────────────────
   const handleSaveMessage = async () => {
-    // FIX: show inline warning instead of silently discarding empty input
     if (!customMessage.trim()) {
       setMessageError('Message cannot be empty.')
       return
@@ -234,7 +239,7 @@ export default function EmergencyPage() {
     setIsEditingMessage(false)
   }
 
-  // ── Send emergency SMS to all contacts via Linking ───────────────────
+  // ── Send emergency SMS ───────────────────────────────────────────────
   const handleTestSend = async () => {
     const contactsWithPhone = emergencyContacts.filter(c => c.phone && c.phone.trim() !== '')
 
@@ -271,9 +276,6 @@ export default function EmergencyPage() {
                   : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
 
                 try {
-                  // FIX: openURL wrapped in its own try/catch — canOpenURL
-                  // is unreliable on Android and can return true even when
-                  // the URL fails to open.
                   await Linking.openURL(smsUrl)
                   successCount++
                   await new Promise(res => setTimeout(res, 1500))
@@ -284,7 +286,6 @@ export default function EmergencyPage() {
               }
             } finally {
               setSending(false)
-              // FIX: always show outcome, success or partial failure
               if (failed.length === 0) {
                 Alert.alert('Done', `SMS opened for ${successCount} contact(s).`)
               } else {
@@ -472,7 +473,6 @@ export default function EmergencyPage() {
                           placeholderTextColor="#9CA3AF"
                           autoFocus
                         />
-                        {/* FIX: inline error instead of silently discarding empty input */}
                         {messageError ? (
                           <Text style={styles.msgErrorText}>{messageError}</Text>
                         ) : null}
