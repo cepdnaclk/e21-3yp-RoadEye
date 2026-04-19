@@ -17,7 +17,7 @@ function RootNavigator() {
         <>
           <Stack.Screen name="Dashboard"  component={DashboardPage} />
           <Stack.Screen name="Emergency"  component={EmergencyPage} />
-          <Stack.Screen name="Navigation" component={NavigationScreen} />  {/* ← new */}
+          <Stack.Screen name="Navigation" component={NavigationScreen} />  
         </>
       ) : (
         <>
