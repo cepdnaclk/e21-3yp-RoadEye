@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
 import Svg, { Path } from 'react-native-svg'
@@ -26,12 +27,13 @@ const weekStats = [
 ]
 
 export default function DashboardPage() {
-  const insets      = useSafeAreaInsets()  // ← added
-  const { logout }  = useAuth()
+  const insets     = useSafeAreaInsets()
+  const { logout } = useAuth()
+  const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}> 
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <DashboardHeader onLogout={logout} />
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -78,6 +80,22 @@ export default function DashboardPage() {
           ))}
         </View>
 
+        <SectionHeader title="Navigation" />
+
+        {/* Navigation HUD button */}
+        <TouchableOpacity
+          style={styles.navBtn}
+          onPress={() => navigation.navigate('Navigation')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.navBtnIcon}>🗺</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navBtnTitle}>Start Navigation</Text>
+            <Text style={styles.navBtnSub}>Turn-by-turn  •  Helmet HUD sync</Text>
+          </View>
+          <Text style={styles.navBtnArrow}>›</Text>
+        </TouchableOpacity>
+
         <SectionHeader title="Statistics" />
         <StatsChart />
 
@@ -119,4 +137,11 @@ const styles = StyleSheet.create({
   statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
   statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
+
+  // Navigation button
+  navBtn:            { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16 },
+  navBtnIcon:        { fontSize: 28 },
+  navBtnTitle:       { fontSize: 15, fontWeight: '800', color: '#fff' },
+  navBtnSub:         { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  navBtnArrow:       { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
 })
