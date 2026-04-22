@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
 import Svg, { Path } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard     from '../components/dashboard/WeatherCard'
@@ -26,13 +28,26 @@ const weekStats = [
 ]
 
 export default function DashboardPage() {
-  const insets      = useSafeAreaInsets()  // ← added
-  const { logout }  = useAuth()
+  const insets     = useSafeAreaInsets()
+  const { logout } = useAuth()
+  const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
+  // Live session state
+  const navSession = useNavSession()
+
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}> 
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       <DashboardHeader onLogout={logout} />
+
+      {/* ── Live navigation banner ── */}
+      {navSession.active && (
+        <NavLiveBanner
+          session={navSession}
+          onResume={() => navigation.navigate('Navigation')}
+          onStop={async () => await stopNavSession()}
+        />
+      )}
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
@@ -78,6 +93,31 @@ export default function DashboardPage() {
           ))}
         </View>
 
+        <SectionHeader title="Navigation" />
+
+        {/* Navigation button — changes appearance when active */}
+        <TouchableOpacity
+          style={[styles.navBtn, navSession.active && styles.navBtnActive]}
+          onPress={() => navigation.navigate('Navigation')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.navBtnIcon}>{navSession.active ? '🔴' : '🗺'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.navBtnTitle}>
+              {navSession.active
+                ? `To: ${navSession.destination?.name || 'Destination'}`
+                : 'Start Navigation'}
+            </Text>
+            <Text style={styles.navBtnSub}>
+              {navSession.active
+                ? `${navSession.distKm} km  •  ${navSession.etaMin} min  •  ${navSession.speed} km/h`
+                : 'Turn-by-turn  •  Helmet HUD sync'}
+            </Text>
+          </View>
+          {navSession.active && <PulseDot />}
+          <Text style={styles.navBtnArrow}>›</Text>
+        </TouchableOpacity>
+
         <SectionHeader title="Statistics" />
         <StatsChart />
 
@@ -89,6 +129,41 @@ export default function DashboardPage() {
   )
 }
 
+// ── Live navigation banner ────────────────────────────────────────────────────
+function NavLiveBanner({ session, onResume, onStop }) {
+  return (
+    <View style={banner.wrap}>
+      <PulseDot />
+      <View style={{ flex: 1 }}>
+        <Text style={banner.title} numberOfLines={1}>
+          🗺  {session.destination?.name || 'Navigation Active'}
+        </Text>
+        {session.currentStep && (
+          <Text style={banner.step} numberOfLines={1}>
+            {session.currentStep.arrow}  {session.currentStep.text}  {session.currentStep.dist}
+          </Text>
+        )}
+      </View>
+      <TouchableOpacity style={banner.resumeBtn} onPress={onResume}>
+        <Text style={banner.resumeText}>OPEN</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={banner.stopBtn} onPress={onStop}>
+        <Text style={banner.stopText}>■</Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+// ── Pulsing red dot ───────────────────────────────────────────────────────────
+function PulseDot() {
+  return (
+    <View style={dot.wrap}>
+      <View style={dot.inner} />
+    </View>
+  )
+}
+
+// ── Section header ────────────────────────────────────────────────────────────
 function SectionHeader({ title }) {
   return (
     <View style={styles.sectionHeader}>
@@ -98,6 +173,7 @@ function SectionHeader({ title }) {
   )
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   screen:            { flex: 1, backgroundColor: C.bg },
   scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
@@ -119,4 +195,55 @@ const styles = StyleSheet.create({
   statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
   statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
+
+  // Nav button
+  navBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16,
+  },
+  navBtnActive: {
+    backgroundColor: '#2a0a0a',
+    borderWidth: 1.5,
+    borderColor: '#ff3b30',
+  },
+  navBtnIcon:  { fontSize: 28 },
+  navBtnTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  navBtnSub:   { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  navBtnArrow: { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
+})
+
+const banner = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: '#1a0505',
+    borderBottomWidth: 1.5, borderBottomColor: '#ff3b30',
+    paddingHorizontal: 16, paddingVertical: 10,
+  },
+  title: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  step:  { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
+  resumeBtn: {
+    backgroundColor: 'rgba(255,59,48,0.15)',
+    borderWidth: 1, borderColor: '#ff3b30',
+    borderRadius: 5, paddingHorizontal: 10, paddingVertical: 5,
+  },
+  resumeText: { fontSize: 11, fontWeight: '800', color: '#ff3b30', letterSpacing: 0.8 },
+  stopBtn: {
+    width: 30, height: 30, borderRadius: 5,
+    backgroundColor: '#ff3b30',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stopText: { fontSize: 13, color: '#fff', fontWeight: '800' },
+})
+
+const dot = StyleSheet.create({
+  wrap: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: 'rgba(255,59,48,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  inner: {
+    width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: '#ff3b30',
+  },
 })

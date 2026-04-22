@@ -7,7 +7,7 @@ const C = colors
 
 const tabs = [
   { id: 'overview',  label: 'Overview',  icon: '📊' },
-  { id: 'explore',   label: 'Explore',   icon: '🧭' },
+ //{ id: 'explore',   label: 'Explore',   icon: '🧭' },
   { id: 'emergency', label: 'Emergency', icon: '📞' },
 ]
 
