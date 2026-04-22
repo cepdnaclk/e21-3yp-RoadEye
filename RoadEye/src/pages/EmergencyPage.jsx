@@ -1,58 +1,61 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity,
   StyleSheet, Switch, Alert, Modal, FlatList,
   TextInput, Linking, Platform, ActivityIndicator
 } from 'react-native'
 import * as Contacts from 'expo-contacts'
-import * as SecureStore from 'expo-secure-store'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../utils/theme'
 
 const C = colors
 
-const KEY_CONTACTS = 'emergency_contacts'
-const KEY_MESSAGE  = 'emergency_custom_message'
+// ─── Use @ prefix — AsyncStorage best practice ────────────────────────────
+const KEY_CONTACTS = '@emergency_contacts'
+const KEY_MESSAGE  = '@emergency_custom_message'
 
-// ─── SecureStore helpers ────────────────────────────────────────────────────
+// ─── AsyncStorage helpers ─────────────────────────────────────────────────
 const save = async (key, value) => {
   try {
-    const serialized = JSON.stringify(value)
-    if (serialized.length > 2000) {
-      console.warn(`SecureStore save [${key}]: value too large (${serialized.length} bytes)`)
-      return false
-    }
-    await SecureStore.setItemAsync(key, serialized)
+    await AsyncStorage.setItem(key, JSON.stringify(value))
     return true
   } catch (e) {
-    console.error(`SecureStore save [${key}]:`, e)
+    console.error(`[Storage] save [${key}]:`, e)
     return false
   }
 }
 
 const load = async (key) => {
   try {
-    const raw = await SecureStore.getItemAsync(key)
+    const raw = await AsyncStorage.getItem(key)
     return raw ? JSON.parse(raw) : null
   } catch (e) {
-    console.error(`SecureStore load [${key}]:`, e)
+    console.error(`[Storage] load [${key}]:`, e)
     return null
   }
 }
 
 const remove = async (key) => {
   try {
-    await SecureStore.deleteItemAsync(key)
+    await AsyncStorage.removeItem(key)
   } catch (e) {
-    console.error(`SecureStore remove [${key}]:`, e)
+    console.error(`[Storage] remove [${key}]:`, e)
   }
 }
 
-// ─── Call this from your Login screen after successful login ───────────────
+// ─── Timeout wrapper — prevents getContactsAsync hanging forever ──────────
+const withTimeout = (promise, ms = 10000) =>
+  Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+    ),
+  ])
+
 export const requestContactsPermissionOnLogin = async () => {
   try {
     const { status } = await Contacts.requestPermissionsAsync()
-    console.log('Contacts permission on login:', status)
     return status === 'granted'
   } catch (e) {
     console.error('requestContactsPermissionOnLogin error:', e)
@@ -62,9 +65,9 @@ export const requestContactsPermissionOnLogin = async () => {
 
 const avatarColors = ['#4F46E5', '#7C3AED', '#2563EB', '#059669', '#DC2626']
 
-// ─── Props: userName (display name), userInitial (letter for avatar) ────────
 export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) {
   const insets = useSafeAreaInsets()
+  const isLoadingContactsRef = useRef(false)   // guard against double-tap
 
   // ── Core state ────────────────────────────────────────────────────────────
   const [emergencyContacts, setEmergencyContacts] = useState([])
@@ -72,20 +75,20 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
   const [sendAlerts,        setSendAlerts]         = useState(true)
   const [sending,           setSending]            = useState(false)
 
-  // Contact picker modal (phone contacts list)
+  // Contact picker modal
   const [showPicker,   setShowPicker]   = useState(false)
   const [allContacts,  setAllContacts]  = useState([])
   const [searchQuery,  setSearchQuery]  = useState('')
   const [loadingConts, setLoadingConts] = useState(false)
 
-  // Contact detail bottom sheet (tap a saved contact)
+  // Contact detail sheet
   const [selectedContact,   setSelectedContact]   = useState(null)
   const [showContactDetail, setShowContactDetail] = useState(false)
 
-  // Profile dropdown menu (H avatar)
+  // Profile dropdown
   const [showProfileMenu, setShowProfileMenu] = useState(false)
 
-  // Section open/close
+  // Section toggles
   const [detailsOpen,  setDetailsOpen]  = useState(true)
   const [contactsOpen, setContactsOpen] = useState(true)
   const [messagesOpen, setMessagesOpen] = useState(true)
@@ -98,27 +101,28 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
   const [messageError,     setMessageError]     = useState('')
   const activeMessage = savedMessage || defaultMessage
 
-  // ── Init: request permission + load saved data ────────────────────────────
+  // ── Init: load persisted data only — no permission request here ──────────
+  // Permission is only asked when the user actively taps "Add Contact"
   useEffect(() => {
     const init = async () => {
-      // Ask for contacts permission as soon as page mounts (simulates login-time request)
-      try {
-        const { status } = await Contacts.requestPermissionsAsync()
-        console.log('contacts permission on mount:', status)
-      } catch (e) {
-        console.error('permission request error:', e)
-      }
-
-      // Load persisted emergency contacts & message
+      console.log('[Init] Loading persisted emergency data...')
       try {
         const [contacts, message] = await Promise.all([
           load(KEY_CONTACTS),
           load(KEY_MESSAGE),
         ])
-        if (contacts) setEmergencyContacts(contacts)
-        if (message)  setSavedMessage(message)
+        if (Array.isArray(contacts) && contacts.length > 0) {
+          console.log('[Init] Loaded', contacts.length, 'contacts from storage')
+          setEmergencyContacts(contacts)
+        } else {
+          console.log('[Init] No saved contacts found')
+        }
+        if (message) {
+          console.log('[Init] Loaded custom message')
+          setSavedMessage(message)
+        }
       } catch (e) {
-        console.error('Failed to load persisted data:', e)
+        console.error('[Init] Failed to load persisted data:', e)
       }
     }
     init()
@@ -126,22 +130,39 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
 
   // ── Open contact picker ───────────────────────────────────────────────────
   const loadContacts = async () => {
+    // Guard: prevent double-tap or re-entry
+    if (isLoadingContactsRef.current) return
     if (emergencyContacts.length >= 5) {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
       return
     }
-    setLoadingConts(true)
-    console.log('=== loadContacts called ===')
-    try {
-      const { status, canAskAgain } = await Contacts.requestPermissionsAsync()
-      console.log('permission status:', status, '| canAskAgain:', canAskAgain)
 
-      if (status !== 'granted') {
+    isLoadingContactsRef.current = true
+    setLoadingConts(true)
+    console.log('[Contacts] loadContacts called')
+
+    try {
+      // Step 1: Check current permission status first (no dialog yet)
+      const { status: existingStatus } = await Contacts.getPermissionsAsync()
+      console.log('[Contacts] existing permission status:', existingStatus)
+
+      let finalStatus = existingStatus
+
+      // Step 2: Only request if not already determined
+      if (existingStatus !== 'granted' && existingStatus !== 'denied') {
+        const { status: requested } = await Contacts.requestPermissionsAsync()
+        console.log('[Contacts] requested permission status:', requested)
+        finalStatus = requested
+      }
+
+      if (finalStatus !== 'granted') {
+        // On 'denied', canAskAgain will be false on iOS after first deny
+        const { canAskAgain } = await Contacts.getPermissionsAsync()
         Alert.alert(
           canAskAgain ? 'Permission Required' : 'Permission Blocked',
           canAskAgain
             ? 'Please allow contacts access to add emergency contacts.'
-            : 'Contacts permission was permanently denied. Please enable it in Settings.',
+            : 'Contacts access was denied. Please enable it in Settings.',
           [
             { text: 'Cancel', style: 'cancel' },
             { text: 'Open Settings', onPress: () => Linking.openSettings() },
@@ -150,45 +171,79 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         return
       }
 
-      const { data } = await Contacts.getContactsAsync({
-        fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
-      })
-      console.log('total contacts fetched:', data?.length ?? 0)
+      console.log('[Contacts] Permission granted — fetching contacts...')
 
-      const filtered = (data || [])
-        .filter(c => c.name && c.phoneNumbers?.length > 0)
-        .map((c, i) => ({ ...c, id: c.id ?? `contact_${i}_${Date.now()}` }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-      console.log('filtered contacts with phone numbers:', filtered.length)
-
-      if (filtered.length === 0) {
-        Alert.alert('No Contacts Found', 'No contacts with phone numbers were found on this device.')
+      // Step 3: Fetch with a 10-second timeout to prevent hanging
+      let data = []
+      try {
+        const result = await withTimeout(
+          Contacts.getContactsAsync({
+            fields: [
+              Contacts.Fields.Name,
+              Contacts.Fields.PhoneNumbers,
+            ],
+            // sort helps on Android
+            sort: Contacts.SortTypes.FirstName,
+          }),
+          10000
+        )
+        data = result?.data ?? []
+        console.log('[Contacts] Raw contacts fetched:', data.length)
+      } catch (fetchErr) {
+        console.error('[Contacts] getContactsAsync error or timeout:', fetchErr)
+        Alert.alert(
+          'Could Not Load Contacts',
+          fetchErr.message?.includes('Timed out')
+            ? 'Loading contacts took too long. Please try again.'
+            : 'An error occurred loading contacts. Please check permissions.',
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ]
+        )
         return
       }
+
+      // Step 4: Filter to only contacts that have a name AND at least one phone number
+      const filtered = data
+        .filter(c => c.name?.trim() && c.phoneNumbers?.length > 0)
+        .map((c, i) => ({
+          ...c,
+          id: c.id ?? `contact_${i}_${Date.now()}`,
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name))
+
+      console.log('[Contacts] Contacts with phone numbers:', filtered.length)
+
+      if (filtered.length === 0) {
+        Alert.alert(
+          'No Contacts Found',
+          data.length === 0
+            ? 'No contacts found on this device.'
+            : `Found ${data.length} contacts but none have phone numbers.`
+        )
+        return
+      }
+
       setAllContacts(filtered)
       setShowPicker(true)
+
     } catch (err) {
-      console.error('loadContacts error:', err)
-      Alert.alert(
-        'Could Not Load Contacts',
-        'Please check contacts permission and try again.',
-        [
-          { text: 'OK', style: 'cancel' },
-          { text: 'Open Settings', onPress: () => Linking.openSettings() },
-        ]
-      )
+      console.error('[Contacts] Unexpected error in loadContacts:', err)
+      Alert.alert('Error', 'Something went wrong. Please try again.')
     } finally {
       setLoadingConts(false)
+      isLoadingContactsRef.current = false
     }
   }
 
-  // ── Add contact from picker ───────────────────────────────────────────────
+  // ── Add contact — optimistic update, persist in background ───────────────
   const handleSelectContact = async (contact) => {
     if (emergencyContacts.length >= 5) {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
       return
     }
-    const phone = contact.phoneNumbers?.[0]?.number || ''
+    const phone = contact.phoneNumbers?.[0]?.number?.trim() || ''
     const already = emergencyContacts.find(
       c => c.id === contact.id || (phone && c.phone === phone)
     )
@@ -196,27 +251,34 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
       Alert.alert('Already Added', `${contact.name} is already in your emergency contacts.`)
       return
     }
-    const updated = [
-      ...emergencyContacts,
-      { id: contact.id ?? `${Date.now()}`, name: contact.name, phone },
-    ]
-    const saved = await save(KEY_CONTACTS, updated)
-    if (!saved) {
-      Alert.alert('Save Failed', 'Could not save this contact. Please try again.')
-      return
+
+    const newContact = {
+      id: contact.id ?? `${Date.now()}`,
+      name: contact.name,
+      phone,
     }
+    const updated = [...emergencyContacts, newContact]
+
+    // Optimistic: update UI immediately, then persist
     setEmergencyContacts(updated)
     setShowPicker(false)
     setSearchQuery('')
+
+    const saved = await save(KEY_CONTACTS, updated)
+    if (!saved) {
+      // Rollback if save failed
+      setEmergencyContacts(emergencyContacts)
+      Alert.alert('Save Failed', 'Could not save this contact. Please try again.')
+    }
   }
 
-  // ── Tap saved contact → show detail sheet ────────────────────────────────
+  // ── View contact detail ───────────────────────────────────────────────────
   const handleViewContact = (contact) => {
     setSelectedContact(contact)
     setShowContactDetail(true)
   }
 
-  // ── Long press / remove ───────────────────────────────────────────────────
+  // ── Remove contact — optimistic update, persist in background ────────────
   const handleRemoveContact = (id) => {
     Alert.alert('Remove Contact', 'Remove this emergency contact?', [
       { text: 'Cancel', style: 'cancel' },
@@ -225,10 +287,16 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         style: 'destructive',
         onPress: async () => {
           const updated = emergencyContacts.filter(c => c.id !== id)
+          const prev = emergencyContacts
+
+          // Optimistic: update UI immediately
           setEmergencyContacts(updated)
+          setShowContactDetail(false)
+
           const saved = await save(KEY_CONTACTS, updated)
           if (!saved) {
-            setEmergencyContacts(emergencyContacts)
+            // Rollback
+            setEmergencyContacts(prev)
             Alert.alert('Error', 'Could not remove contact. Please try again.')
           }
         },
@@ -244,14 +312,15 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     }
     setMessageError('')
     const msg = customMessage.trim()
+    setSavedMessage(msg)           // optimistic
+    setIsEditingMessage(false)
     const saved = await save(KEY_MESSAGE, msg)
     if (!saved) {
+      setSavedMessage(savedMessage) // rollback
       Alert.alert('Save Failed', 'Could not save your message. Please try again.')
-      return
+    } else {
+      Alert.alert('Saved!', 'Your custom emergency message has been saved.')
     }
-    setSavedMessage(msg)
-    Alert.alert('Saved!', 'Your custom emergency message has been saved.')
-    setIsEditingMessage(false)
   }
 
   const handleResetMessage = () => {
@@ -262,7 +331,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     setIsEditingMessage(false)
   }
 
-  // ── Send emergency SMS to all contacts ───────────────────────────────────
+  // ── Send emergency SMS ────────────────────────────────────────────────────
   const handleTestSend = async () => {
     const contactsWithPhone = emergencyContacts.filter(c => c.phone?.trim())
     if (emergencyContacts.length === 0) {
@@ -322,11 +391,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
 
-      {/* ══════════════════════════════════════════════════════
-          SHARED HEADER — same across all pages in the app.
-          Move this into a shared HeaderBar component and
-          import it on every screen for consistent behaviour.
-      ══════════════════════════════════════════════════════ */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Emergency</Text>
         <View style={styles.headerIcons}>
@@ -336,7 +400,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
           <TouchableOpacity style={styles.iconBtn}>
             <Text style={styles.iconText}>🔔</Text>
           </TouchableOpacity>
-          {/* Tapping the H avatar opens the profile dropdown */}
           <TouchableOpacity
             style={styles.avatar}
             onPress={() => setShowProfileMenu(true)}
@@ -404,7 +467,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
                     </TouchableOpacity>
                   ))}
 
-                  {/* Add button — hidden once 5 contacts added */}
                   {emergencyContacts.length < 5 && (
                     <TouchableOpacity onPress={loadContacts} style={styles.contactItem} disabled={loadingConts}>
                       <View style={styles.addContactBtn}>
@@ -520,11 +582,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      {/* ══════════════════════════════════════════════════════
-          PROFILE DROPDOWN MENU
-          Share this logic across all pages via a shared
-          HeaderBar component + context/navigation props.
-      ══════════════════════════════════════════════════════ */}
+      {/* ── Profile Dropdown ─────────────────────────────────────────────── */}
       <Modal
         visible={showProfileMenu}
         transparent
@@ -543,54 +601,19 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
               </View>
               <Text style={styles.profileMenuName}>Hirushi</Text>
             </View>
-
             <View style={styles.profileMenuDivider} />
-
-            <TouchableOpacity
-              style={styles.profileMenuItem}
-              onPress={() => {
-                setShowProfileMenu(false)
-                // TODO: navigation.navigate('ChangeProfile')
-                Alert.alert('Change Profile', 'Hook up your navigation here.')
-              }}
-            >
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Change Profile', 'Hook up your navigation here.') }}>
               <Text style={styles.profileMenuItemIcon}>👤</Text>
               <Text style={styles.profileMenuItemText}>Change Profile</Text>
               <Text style={styles.profileMenuItemArrow}>›</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.profileMenuItem}
-              onPress={() => {
-                setShowProfileMenu(false)
-                // TODO: navigation.navigate('Settings')
-                Alert.alert('Settings', 'Hook up your navigation here.')
-              }}
-            >
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Settings', 'Hook up your navigation here.') }}>
               <Text style={styles.profileMenuItemIcon}>⚙️</Text>
               <Text style={styles.profileMenuItemText}>Settings</Text>
               <Text style={styles.profileMenuItemArrow}>›</Text>
             </TouchableOpacity>
-
             <View style={styles.profileMenuDivider} />
-
-            <TouchableOpacity
-              style={styles.profileMenuItem}
-              onPress={() => {
-                setShowProfileMenu(false)
-                Alert.alert('Log Out', 'Are you sure you want to log out?', [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Log Out',
-                    style: 'destructive',
-                    onPress: () => {
-                      // TODO: Clear auth token and navigate to Login
-                      // navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
-                    },
-                  },
-                ])
-              }}
-            >
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Log Out', 'Are you sure?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Log Out', style: 'destructive', onPress: () => {} }]) }}>
               <Text style={styles.profileMenuItemIcon}>🚪</Text>
               <Text style={[styles.profileMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
               <Text style={[styles.profileMenuItemArrow, { color: '#EF4444' }]}>›</Text>
@@ -599,10 +622,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         </TouchableOpacity>
       </Modal>
 
-      {/* ══════════════════════════════════════════════════════
-          CONTACT DETAIL BOTTOM SHEET
-          Shown when user taps a saved contact bubble
-      ══════════════════════════════════════════════════════ */}
+      {/* ── Contact Detail Sheet ─────────────────────────────────────────── */}
       <Modal
         visible={showContactDetail}
         transparent
@@ -620,42 +640,23 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
                   </View>
                   <Text style={styles.detailName}>{selectedContact.name}</Text>
                   <Text style={styles.detailPhone}>{selectedContact.phone || 'No phone number'}</Text>
-
                   <View style={styles.detailActions}>
-                    <TouchableOpacity
-                      style={styles.detailCallBtn}
-                      onPress={() => {
-                        if (selectedContact.phone) {
-                          Linking.openURL(`tel:${selectedContact.phone.replace(/\s/g, '')}`)
-                        }
-                      }}
-                    >
+                    <TouchableOpacity style={styles.detailCallBtn} onPress={() => { if (selectedContact.phone) Linking.openURL(`tel:${selectedContact.phone.replace(/\s/g, '')}`) }}>
                       <Text style={styles.detailCallBtnText}>📞  Call</Text>
                     </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={styles.detailSmsBtn}
-                      onPress={() => {
-                        if (selectedContact.phone) {
-                          const phone = selectedContact.phone.replace(/\s/g, '')
-                          const smsUrl = Platform.OS === 'android'
-                            ? `smsto:${phone}?body=${encodeURIComponent(activeMessage)}`
-                            : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
-                          Linking.openURL(smsUrl)
-                        }
-                      }}
-                    >
+                    <TouchableOpacity style={styles.detailSmsBtn} onPress={() => {
+                      if (selectedContact.phone) {
+                        const phone = selectedContact.phone.replace(/\s/g, '')
+                        const smsUrl = Platform.OS === 'android' ? `smsto:${phone}?body=${encodeURIComponent(activeMessage)}` : `sms:${phone}&body=${encodeURIComponent(activeMessage)}`
+                        Linking.openURL(smsUrl)
+                      }
+                    }}>
                       <Text style={styles.detailSmsBtnText}>💬  SMS</Text>
                     </TouchableOpacity>
                   </View>
-
-                  <TouchableOpacity
-                    style={styles.detailRemoveBtn}
-                    onPress={() => { setShowContactDetail(false); handleRemoveContact(selectedContact.id) }}
-                  >
+                  <TouchableOpacity style={styles.detailRemoveBtn} onPress={() => handleRemoveContact(selectedContact.id)}>
                     <Text style={styles.detailRemoveBtnText}>🗑  Remove Contact</Text>
                   </TouchableOpacity>
-
                   <TouchableOpacity style={styles.detailCloseBtn} onPress={() => setShowContactDetail(false)}>
                     <Text style={styles.detailCloseBtnText}>Close</Text>
                   </TouchableOpacity>
@@ -666,10 +667,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         </View>
       </Modal>
 
-      {/* ══════════════════════════════════════════════════════
-          CONTACT PICKER MODAL
-          Phone contacts list with search
-      ══════════════════════════════════════════════════════ */}
+      {/* ── Contact Picker Modal ─────────────────────────────────────────── */}
       <Modal
         visible={showPicker}
         animationType="slide"
@@ -731,7 +729,6 @@ const styles = StyleSheet.create({
   screen:               { flex: 1, backgroundColor: '#F5F6FA' },
   scroll:               { paddingHorizontal: 16, paddingBottom: 20 },
 
-  // Header
   header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#F0F0F5' },
   headerTitle:          { fontSize: 24, fontWeight: '900', color: '#1a1a2e' },
   headerIcons:          { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -740,12 +737,10 @@ const styles = StyleSheet.create({
   avatar:               { width: 34, height: 34, borderRadius: 17, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
   avatarText:           { color: '#fff', fontWeight: '800', fontSize: 14 },
 
-  // Action cards
   actionCard:           { backgroundColor: C.primary, borderRadius: 14, padding: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 },
   actionCardText:       { color: '#fff', fontSize: 16, fontWeight: '700' },
   actionCardIcon:       { fontSize: 16, color: '#fff' },
 
-  // Dropdown
   dropdownContent:      { backgroundColor: '#fff', borderRadius: 16, marginTop: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2, overflow: 'hidden' },
   subHeader:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: '#fff' },
   subHeaderLeft:        { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -756,7 +751,6 @@ const styles = StyleSheet.create({
   sectionDivider:       { height: 1, backgroundColor: '#F0F0F5', marginHorizontal: 16 },
   cardDesc:             { fontSize: 12, color: '#6B7280', lineHeight: 18, marginBottom: 16 },
 
-  // Contacts row
   contactsRow:          { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 8 },
   contactItem:          { alignItems: 'center', width: 56 },
   contactAvatar:        { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
@@ -769,12 +763,10 @@ const styles = StyleSheet.create({
   addContactIcon:       { fontSize: 24, color: C.primary, fontWeight: '300' },
   hintText:             { fontSize: 10, color: '#9CA3AF', marginTop: 4 },
 
-  // Switches
   switchRow:            { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
   switchLabel:          { fontSize: 14, fontWeight: '600', color: '#1a1a2e' },
   divider:              { height: 1, backgroundColor: '#F3F4F6', marginVertical: 4 },
 
-  // Message
   messagePreviewBox:    { backgroundColor: '#FFF7ED', borderRadius: 12, padding: 14, marginTop: 2, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: '#F97316' },
   msgLabelRow:          { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 },
   msgLabelDot:          { fontSize: 8, color: '#F97316' },
@@ -794,14 +786,12 @@ const styles = StyleSheet.create({
   saveMsgBtn:           { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, backgroundColor: C.primary },
   saveMsgBtnText:       { fontSize: 12, color: '#fff', fontWeight: '700' },
 
-  // Test button
   testBtn:              { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1a1a2e', borderRadius: 14, padding: 16, marginTop: 20, borderWidth: 2, borderColor: '#F97316', borderStyle: 'dashed' },
   testBtnDisabled:      { opacity: 0.5 },
   testBtnIcon:          { fontSize: 18 },
   testBtnText:          { color: '#F97316', fontSize: 15, fontWeight: '800' },
   testHint:             { textAlign: 'center', fontSize: 10, color: '#9CA3AF', marginTop: 6 },
 
-  // Profile dropdown
   profileOverlay:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' },
   profileMenu:          { position: 'absolute', right: 16, backgroundColor: '#fff', borderRadius: 16, width: 220, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 10, overflow: 'hidden' },
   profileMenuHeader:    { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
@@ -814,7 +804,6 @@ const styles = StyleSheet.create({
   profileMenuItemText:  { flex: 1, fontSize: 15, fontWeight: '600', color: '#1a1a2e' },
   profileMenuItemArrow: { fontSize: 18, color: '#9CA3AF' },
 
-  // Contact detail sheet
   detailOverlay:        { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   detailSheet:          { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, alignItems: 'center', paddingBottom: 40 },
   detailAvatar:         { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
@@ -831,7 +820,6 @@ const styles = StyleSheet.create({
   detailCloseBtn:       { paddingVertical: 10 },
   detailCloseBtnText:   { fontSize: 14, color: '#9CA3AF', fontWeight: '600' },
 
-  // Contact picker modal
   modalScreen:          { flex: 1, backgroundColor: '#fff' },
   modalHeader:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#F0F0F5' },
   modalTitle:           { fontSize: 20, fontWeight: '800', color: '#1a1a2e' },
