@@ -68,22 +68,24 @@ export default function NavigationScreen({ navigation }) {
     if (existing.active && existing.destination) {
       sessionActive.current = true
 
-      // Restore weather card immediately — don't wait for map round-trip
+      // Restore weather card immediately
       setDestinationWeatherTarget({
         lat:  existing.destination.lat,
         lng:  existing.destination.lng,
         name: existing.destination.name,
       })
 
-      // Tell the map to rebuild the route visually
-      injectMessage({
-        type:        'restoreRoute',
-        destination: existing.destination.name,
-        destLat:     existing.destination.lat,
-        destLng:     existing.destination.lng,
-        distKm:      existing.distKm,
-        etaMin:      existing.etaMin,
-      })
+      // Small delay so the map JS finishes attaching its message listener
+      setTimeout(() => {
+        injectMessage({
+          type:        'restoreRoute',
+          destination: existing.destination.name,
+          destLat:     existing.destination.lat,
+          destLng:     existing.destination.lng,
+          distKm:      existing.distKm,
+          etaMin:      existing.etaMin,
+        })
+      }, 500)
     }
     startGPS()
   }, [startGPS, injectMessage])

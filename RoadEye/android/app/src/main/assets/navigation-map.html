@@ -229,11 +229,28 @@
     let currentStep = 0
     let navigationActive = false
     let searchTimeout = null
+    let mapReady = false        // true once Leaflet tiles have loaded
+    let pendingRestore = null   // holds restoreRoute msg if it arrives before map is ready
 
     map = L.map('map', { zoomControl: true, attributionControl: false })
           .setView([7.8731, 80.7718], 8)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
+    const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 })
+    tileLayer.addTo(map)
+    // Mark map ready once first tile batch loads
+    tileLayer.on('load', () => {
+      if (!mapReady) {
+        mapReady = true
+        if (pendingRestore) { restoreRoute(pendingRestore); pendingRestore = null }
+      }
+    })
+    // Fallback: if tiles are slow or offline, still mark ready after 3s
+    setTimeout(() => {
+      if (!mapReady) {
+        mapReady = true
+        if (pendingRestore) { restoreRoute(pendingRestore); pendingRestore = null }
+      }
+    }, 3000)
 
     function placeUserMarker(lat, lng) {
       const icon = L.divIcon({
@@ -528,9 +545,13 @@
           if (navigationActive && currentInstructions.length > 0) updateNavigationStep()
         }
 
-        // ── KEY FIX: handle restoreRoute to rebuild map on OPEN ──────────────
+        // ── Restore active route when returning from dashboard ───────────────
         if (msg.type === 'restoreRoute' && msg.destLat && msg.destLng) {
-          restoreRoute(msg)
+          if (mapReady) {
+            restoreRoute(msg)
+          } else {
+            pendingRestore = msg   // map still initialising — process once ready
+          }
         }
 
         if (msg.type === 'helmetConnected') {
