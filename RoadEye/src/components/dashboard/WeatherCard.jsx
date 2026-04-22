@@ -3,6 +3,10 @@ import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import * as Location from 'expo-location'
 import { colors } from '../../utils/theme'
+import {
+  registerDestWeatherListener,
+  unregisterDestWeatherListener,
+} from '../../utils/NavigationSession'
 
 const C = colors
 
@@ -49,14 +53,6 @@ const wmoIcon = (code) => {
   return                   { icon: '⛈️',  label: 'Storm' }
 }
 
-// ── Global destination event bus ───────────────────────────────────────────
-// NavigationScreen calls setDestinationWeatherTarget({ lat, lng, name })
-// when a route starts, and setDestinationWeatherTarget(null) when cleared.
-let _destListener = null
-export const setDestinationWeatherTarget = (target) => {
-  if (_destListener) _destListener(target)
-}
-
 // ── COMPONENT ─────────────────────────────────────────────────────────────
 export default function WeatherCard() {
   const [origin,      setOrigin]      = useState(null)
@@ -65,9 +61,9 @@ export default function WeatherCard() {
   const [destLoading, setDestLoading] = useState(false)
   const refreshTimer = useRef(null)
 
-  // ── Destination listener ─────────────────────────────────────────────────
+  // ── Register with NavigationSession so stop/start both reach us ──────────
   useEffect(() => {
-    _destListener = async (target) => {
+    registerDestWeatherListener(async (target) => {
       if (!target) {
         setDest(null)
         setDestLoading(false)
@@ -82,8 +78,8 @@ export default function WeatherCard() {
       } finally {
         setDestLoading(false)
       }
-    }
-    return () => { _destListener = null }
+    })
+    return () => unregisterDestWeatherListener()
   }, [])
 
   // ── Origin weather (live location, refreshes every 1 min) ────────────────
@@ -150,13 +146,12 @@ export default function WeatherCard() {
   )
 }
 
-// ── Full-width block (no destination) ────────────────────────────────────────
+// ── Full-width block ──────────────────────────────────────────────────────────
 function FullWeatherBlock({ data }) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
   return (
     <View style={styles.fullBlock}>
-      {/* Left: temp + condition */}
       <View style={styles.fullLeft}>
         <Text style={styles.fullTemp}>
           {data.temp}°<Text style={styles.fullUnit}>C</Text>
@@ -164,8 +159,6 @@ function FullWeatherBlock({ data }) {
         <Text style={styles.fullCondition}>{condition}</Text>
         <Text style={styles.fullRange}>H: {data.high}°  L: {data.low}°</Text>
       </View>
-
-      {/* Middle: meta */}
       <View style={styles.fullMeta}>
         <View style={styles.fullMetaRow}>
           <Text>💧</Text>
@@ -179,8 +172,6 @@ function FullWeatherBlock({ data }) {
         </View>
         <Text style={styles.fullLocation} numberOfLines={1}>{data.name}</Text>
       </View>
-
-      {/* Right: icon */}
       <View style={styles.fullIconBox}>
         <Text style={styles.fullIcon}>{icon}</Text>
       </View>
@@ -188,7 +179,7 @@ function FullWeatherBlock({ data }) {
   )
 }
 
-// ── Compact split block (with destination) ────────────────────────────────────
+// ── Compact split block ───────────────────────────────────────────────────────
 function SplitWeatherBlock({ data, label, accent }) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
@@ -215,71 +206,42 @@ function SplitWeatherBlock({ data, label, accent }) {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: C.white,
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    borderRadius: 16, padding: 16, marginVertical: 10,
+    flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 2,
   },
-  loadingCard: {
-    justifyContent: 'center', gap: 10, minHeight: 80,
-  },
-  loadingText: { fontSize: 12, color: C.muted },
+  loadingCard:  { justifyContent: 'center', gap: 10, minHeight: 80 },
+  loadingText:  { fontSize: 12, color: C.muted },
 
-  // ── Full block ──────────────────────────────────────────────────────────
-  fullBlock: {
-    flex: 1, flexDirection: 'row', alignItems: 'center',
-  },
-  fullLeft: { marginRight: 4 },
-  fullTemp: { fontSize: 32, fontWeight: '800', color: C.text, lineHeight: 36 },
-  fullUnit: { fontSize: 11, color: C.muted },
-  fullCondition: { fontSize: 12, fontWeight: '600', color: C.text, marginTop: 4 },
-  fullRange: { fontSize: 10, color: C.muted },
-
-  fullMeta: { flex: 1, paddingLeft: 20, gap: 6 },
-  fullMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  fullMetaLabel: { fontSize: 12, fontWeight: '600', color: C.text },
-  fullMetaVal: { fontSize: 12, fontWeight: '700', color: C.text, marginLeft: 'auto' },
+  fullBlock:    { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  fullLeft:     { marginRight: 4 },
+  fullTemp:     { fontSize: 32, fontWeight: '800', color: C.text, lineHeight: 36 },
+  fullUnit:     { fontSize: 11, color: C.muted },
+  fullCondition:{ fontSize: 12, fontWeight: '600', color: C.text, marginTop: 4 },
+  fullRange:    { fontSize: 10, color: C.muted },
+  fullMeta:     { flex: 1, paddingLeft: 20, gap: 6 },
+  fullMetaRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fullMetaLabel:{ fontSize: 12, fontWeight: '600', color: C.text },
+  fullMetaVal:  { fontSize: 12, fontWeight: '700', color: C.text, marginLeft: 'auto' },
   fullLocation: { fontSize: 10, color: C.muted, marginTop: 6 },
+  fullIconBox:  { width: 52, height: 52, borderRadius: 14, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  fullIcon:     { fontSize: 26 },
 
-  fullIconBox: {
-    width: 52, height: 52, borderRadius: 14,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center', justifyContent: 'center', marginLeft: 12,
-  },
-  fullIcon: { fontSize: 26 },
-
-  // ── Split blocks ────────────────────────────────────────────────────────
-  splitBlock: { flex: 1, paddingHorizontal: 4 },
-  splitLabel: {
-    fontSize: 9, fontWeight: '800',
-    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2,
-  },
+  splitBlock:    { flex: 1, paddingHorizontal: 4 },
+  splitLabel:    { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 },
   splitLocation: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 5 },
-  splitTempRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginBottom: 2 },
-  splitIcon: { fontSize: 22, lineHeight: 30 },
-  splitTemp: { fontSize: 28, fontWeight: '800', color: C.text, lineHeight: 32 },
-  splitUnit: { fontSize: 10, color: C.muted, marginBottom: 3 },
-  splitCondition: { fontSize: 11, fontWeight: '600', color: C.text },
-  splitRange: { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 5 },
-  splitMeta: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  splitTempRow:  { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginBottom: 2 },
+  splitIcon:     { fontSize: 22, lineHeight: 30 },
+  splitTemp:     { fontSize: 28, fontWeight: '800', color: C.text, lineHeight: 32 },
+  splitUnit:     { fontSize: 10, color: C.muted, marginBottom: 3 },
+  splitCondition:{ fontSize: 11, fontWeight: '600', color: C.text },
+  splitRange:    { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 5 },
+  splitMeta:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   splitMetaItem: { fontSize: 10, color: C.text, fontWeight: '500' },
 
-  // ── Divider ─────────────────────────────────────────────────────────────
-  divider: {
-    width: 1, alignSelf: 'stretch',
-    backgroundColor: '#E5E7EB', marginHorizontal: 8,
-  },
+  divider: { width: 1, alignSelf: 'stretch', backgroundColor: '#E5E7EB', marginHorizontal: 8 },
 
-  // ── Dest loading ────────────────────────────────────────────────────────
-  destLoading: {
-    flex: 1, alignItems: 'center',
-    justifyContent: 'center', gap: 8, paddingHorizontal: 4,
-  },
+  destLoading:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 4 },
   destLoadingText: { fontSize: 11, color: C.muted },
 })
