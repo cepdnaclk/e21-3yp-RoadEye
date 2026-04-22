@@ -150,6 +150,18 @@
       border-radius: 50%;
       box-shadow: 0 0 0 4px rgba(79,70,229,0.3);
     }
+
+    /* Restoring overlay — shown while route is being rebuilt */
+    #restore-banner {
+      position: absolute; top: 80px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      background: rgba(79,70,229,0.92); color: #fff;
+      border-radius: 10px; padding: 8px 18px;
+      font-size: 13px; font-weight: 700;
+      display: none;
+    }
+    #restore-banner.visible { display: block; }
   </style>
 </head>
 <body>
@@ -169,6 +181,8 @@
     <div id="helmet-dot"></div>
     <span id="helmet-status">Helmet Sync</span>
   </div>
+
+  <div id="restore-banner">🔄 Restoring navigation…</div>
 
   <button id="locate-btn" title="My Location">📍</button>
 
@@ -327,7 +341,37 @@
       }
     }
 
-    function buildRoute(name) {
+    // ── Restore route from saved session (called on OPEN from dashboard) ──────
+    // Waits for GPS fix first, then rebuilds the route silently.
+    function restoreRoute(msg) {
+      destLat  = msg.destLat
+      destLng  = msg.destLng
+      destName = msg.destination
+
+      document.getElementById('search-input').value = destName || ''
+      document.getElementById('restore-banner').classList.add('visible')
+
+      const doRestore = () => {
+        document.getElementById('restore-banner').classList.remove('visible')
+        buildRoute(destName, true)   // true = restored (auto-start navigation)
+      }
+
+      if (userLat !== null) {
+        doRestore()
+      } else {
+        // Wait for GPS then restore
+        navigator.geolocation.getCurrentPosition((pos) => {
+          userLat = pos.coords.latitude
+          userLng = pos.coords.longitude
+          placeUserMarker(userLat, userLng)
+          doRestore()
+        }, () => {
+          document.getElementById('restore-banner').classList.remove('visible')
+        }, { enableHighAccuracy: true, timeout: 8000 })
+      }
+    }
+
+    function buildRoute(name, autoStart) {
       if (routingControl) { map.removeControl(routingControl); routingControl = null }
 
       routingControl = L.Routing.control({
@@ -368,12 +412,11 @@
         currentStep = 0
         showStep(0)
 
-        // ── Send route WITH destLat/destLng so WeatherCard can fetch destination weather ──
         postToApp({
           type:        'route',
           destination: name,
-          destLat:     destLat,       // ← destination coordinates for weather
-          destLng:     destLng,       // ← destination coordinates for weather
+          destLat:     destLat,
+          destLng:     destLng,
           distKm:      distKm,
           etaMin:      mins,
           steps: currentInstructions.map(s => ({
@@ -384,6 +427,16 @@
         })
 
         document.getElementById('info-panel').classList.add('visible')
+
+        // If restoring a session, automatically resume navigating
+        if (autoStart) {
+          navigationActive = true
+          currentStep = 0
+          showStep(0)
+          if (userLat) map.setView([userLat, userLng], 17)
+          document.getElementById('btn-start').textContent = '🧭 Navigating...'
+          document.getElementById('btn-start').style.background = '#10b981'
+        }
       })
     }
 
@@ -422,7 +475,6 @@
         document.getElementById('turn-text').textContent = 'You have arrived!'
         document.getElementById('turn-dist').textContent = ''
         navigationActive = false
-        // Tell the app navigation is complete
         postToApp({ type: 'arrived', destination: destName })
       }
     }
@@ -447,8 +499,6 @@
       currentInstructions = []
       currentStep = 0
       destLat = null; destLng = null; destName = null
-
-      // ── Tell the app route was cleared so WeatherCard removes destination ──
       postToApp({ type: 'clear' })
     })
 
@@ -466,13 +516,23 @@
         document.getElementById('suggestions').style.display = 'none'
     })
 
+    // ── Message handler from React Native ────────────────────────────────────
     window.addEventListener('message', (e) => {
       try {
         const msg = JSON.parse(e.data)
-        if (msg.type === 'location' && msg.lat && msg.lng) {
+
+        if (msg.type === 'gps' && msg.lat && msg.lng) {
           userLat = msg.lat; userLng = msg.lng
           placeUserMarker(userLat, userLng)
+          document.getElementById('stat-speed').textContent = msg.speed || 0
+          if (navigationActive && currentInstructions.length > 0) updateNavigationStep()
         }
+
+        // ── KEY FIX: handle restoreRoute to rebuild map on OPEN ──────────────
+        if (msg.type === 'restoreRoute' && msg.destLat && msg.destLng) {
+          restoreRoute(msg)
+        }
+
         if (msg.type === 'helmetConnected') {
           document.getElementById('helmet-dot').style.background = '#10b981'
           document.getElementById('helmet-status').textContent = 'Helmet Connected'

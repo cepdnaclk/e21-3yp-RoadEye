@@ -66,8 +66,16 @@ export default function NavigationScreen({ navigation }) {
     webViewReady.current = true
     const existing = getNavState()
     if (existing.active && existing.destination) {
-      // Resume: re-inject the saved route so the map restores it
       sessionActive.current = true
+
+      // Restore weather card immediately — don't wait for map round-trip
+      setDestinationWeatherTarget({
+        lat:  existing.destination.lat,
+        lng:  existing.destination.lng,
+        name: existing.destination.name,
+      })
+
+      // Tell the map to rebuild the route visually
       injectMessage({
         type:        'restoreRoute',
         destination: existing.destination.name,
