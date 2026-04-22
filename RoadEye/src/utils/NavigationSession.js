@@ -1,7 +1,4 @@
 // src/utils/NavigationSession.js
-// Global navigation session — survives screen changes, app backgrounding.
-// Import this anywhere in the app to read or control the active session.
-
 import { useEffect, useState } from 'react'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
@@ -9,7 +6,7 @@ import * as Notifications from 'expo-notifications'
 
 export const NAV_TASK = 'ROADEYE_NAV_TASK'
 
-// ── Internal state (module-level singleton) ─────────────────────────────────
+// ── Internal singleton state ─────────────────────────────────────────────────
 let _state = {
   active:      false,
   destination: null,   // { name, lat, lng }
@@ -18,13 +15,22 @@ let _state = {
   currentStep: null,   // { arrow, text, dist }
   speed:       0,
 }
-let _listeners = new Set()
+let _listeners    = new Set()
+let _destWeatherCb = null   // WeatherCard registers here
 
 const notify = () => _listeners.forEach(fn => fn({ ..._state }))
 
-// ── Public API ───────────────────────────────────────────────────────────────
+// ── WeatherCard destination bridge ───────────────────────────────────────────
+// WeatherCard calls this to register itself on mount
+export const registerDestWeatherListener = (cb) => { _destWeatherCb = cb }
+export const unregisterDestWeatherListener = ()  => { _destWeatherCb = null }
 
-/** Start a navigation session */
+// Called by NavigationScreen when route starts / clears
+export const setDestinationWeatherTarget = (target) => {
+  if (_destWeatherCb) _destWeatherCb(target)
+}
+
+// ── Public API ────────────────────────────────────────────────────────────────
 export const startNavSession = async ({ destination, distKm, etaMin }) => {
   _state = { ..._state, active: true, destination, distKm, etaMin }
   notify()
@@ -32,28 +38,26 @@ export const startNavSession = async ({ destination, distKm, etaMin }) => {
   await startBackgroundLocation()
 }
 
-/** Update current turn step (called from NavigationScreen) */
 export const updateNavStep = (step) => {
   _state = { ..._state, currentStep: step }
   notify()
   updateNotification(step?.text, step?.dist)
 }
 
-/** Update speed */
 export const updateNavSpeed = (speed) => {
   _state = { ..._state, speed }
   notify()
 }
 
-/** Stop the session entirely */
 export const stopNavSession = async () => {
   _state = { active: false, destination: null, distKm: null, etaMin: null, currentStep: null, speed: 0 }
   notify()
+  // Also clear destination weather in WeatherCard
+  setDestinationWeatherTarget(null)
   await Notifications.dismissAllNotificationsAsync()
   try { await Location.stopLocationUpdatesAsync(NAV_TASK) } catch (_) {}
 }
 
-/** Read current state (non-hook) */
 export const getNavState = () => ({ ..._state })
 
 // ── React hook ────────────────────────────────────────────────────────────────
@@ -61,20 +65,19 @@ export const useNavSession = () => {
   const [state, setState] = useState({ ..._state })
   useEffect(() => {
     _listeners.add(setState)
+    setState({ ..._state })   // sync immediately on mount
     return () => _listeners.delete(setState)
   }, [])
   return state
 }
 
-// ── Background location task ─────────────────────────────────────────────────
-// Keeps GPS alive when app is backgrounded so helmet stays synced.
+// ── Background location task ──────────────────────────────────────────────────
 TaskManager.defineTask(NAV_TASK, ({ data, error }) => {
   if (error) { console.warn('[NavTask]', error); return }
   if (data?.locations?.length) {
     const { latitude, longitude, speed } = data.locations[0].coords
     const kmh = speed ? Math.round(speed * 3.6) : _state.speed
     updateNavSpeed(kmh)
-    // Broadcast to any active helmet WebSocket (imported lazily to avoid cycles)
     try {
       const { broadcastHelmet } = require('./HelmetBridge')
       broadcastHelmet({ type: 'location', lat: latitude, lng: longitude, speed: kmh })
@@ -85,7 +88,7 @@ TaskManager.defineTask(NAV_TASK, ({ data, error }) => {
 const startBackgroundLocation = async () => {
   const { status } = await Location.requestBackgroundPermissionsAsync()
   if (status !== 'granted') {
-    console.warn('[NavSession] Background location denied — GPS paused when backgrounded')
+    console.warn('[NavSession] Background location denied')
     return
   }
   const running = await Location.hasStartedLocationUpdatesAsync(NAV_TASK).catch(() => false)
