@@ -13,6 +13,7 @@ import {
   updateNavSpeed,
   getNavState,
 } from '../utils/NavigationSession'
+import { setDestinationWeatherTarget } from '../components/dashboard/WeatherCard'
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
@@ -65,6 +66,19 @@ export default function NavigationScreen({ navigation }) {
       if (msg.type === 'clear') {
         sessionActive.current = false
         await stopNavSession()
+      }
+
+      // When a route is set, update the weather card
+      if (msg.type === 'route') {
+        setDestinationWeatherTarget({
+          lat: destLat,
+          lng: destLng,
+          name: msg.destination,
+        })
+      }
+      // When route is cleared, remove destination weather
+      if (msg.type === 'clear') {
+        setDestinationWeatherTarget(null)
       }
 
     } catch (_) {}
