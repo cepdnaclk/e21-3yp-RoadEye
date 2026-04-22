@@ -72,7 +72,7 @@ export default function WeatherCard() {
   useEffect(() => {
     _destListener = async (target) => {
       destTarget.current = target
-      if (!target) { setDest(null); return }
+      if (!target) { setDest(null); setDestLoading(false); return }
       setDestLoading(true)
       try {
         const w = await fetchWeather(target.lat, target.lng)
@@ -105,8 +105,8 @@ export default function WeatherCard() {
 
   useEffect(() => {
     loadOrigin()
-    // Refresh every 1 minutes
-    refreshTimer.current = setInterval(loadOrigin, 60 * 1000)
+    // Refresh every 10 minutes
+    refreshTimer.current = setInterval(loadOrigin, 10 * 60 * 1000)
     return () => clearInterval(refreshTimer.current)
   }, [])
 

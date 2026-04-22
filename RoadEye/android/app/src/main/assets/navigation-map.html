@@ -5,9 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>RoadEye Navigation</title>
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet Routing Machine CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
 
   <style>
@@ -20,17 +18,11 @@
       overflow: hidden;
     }
 
-    #map {
-      width: 100%;
-      height: 100vh;
-      z-index: 1;
-    }
+    #map { width: 100%; height: 100vh; z-index: 1; }
 
-    /* ── Search bar overlay ── */
     #search-container {
       position: absolute;
-      top: 14px;
-      left: 50%;
+      top: 14px; left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
       width: calc(100% - 32px);
@@ -38,10 +30,8 @@
     }
 
     #search-box {
-      display: flex;
-      align-items: center;
-      background: #fff;
-      border-radius: 14px;
+      display: flex; align-items: center;
+      background: #fff; border-radius: 14px;
       padding: 0 14px;
       box-shadow: 0 4px 20px rgba(0,0,0,0.25);
       gap: 8px;
@@ -50,48 +40,29 @@
     #search-icon { font-size: 16px; color: #888; }
 
     #search-input {
-      flex: 1;
-      border: none;
-      outline: none;
-      font-size: 15px;
-      padding: 14px 0;
-      color: #1a1a2e;
-      background: transparent;
+      flex: 1; border: none; outline: none;
+      font-size: 15px; padding: 14px 0;
+      color: #1a1a2e; background: transparent;
     }
-
     #search-input::placeholder { color: #aaa; }
 
     #search-btn {
-      background: #4F46E5;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 8px 14px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
+      background: #4F46E5; color: #fff; border: none;
+      border-radius: 10px; padding: 8px 14px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
     }
 
     #suggestions {
-      background: #fff;
-      border-radius: 12px;
-      margin-top: 6px;
-      overflow: hidden;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      background: #fff; border-radius: 12px; margin-top: 6px;
+      overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
       display: none;
     }
 
     .suggestion-item {
-      padding: 12px 16px;
-      font-size: 13px;
-      color: #1a1a2e;
-      cursor: pointer;
-      border-bottom: 1px solid #f3f4f6;
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      padding: 12px 16px; font-size: 13px; color: #1a1a2e;
+      cursor: pointer; border-bottom: 1px solid #f3f4f6;
+      display: flex; align-items: center; gap: 10px;
     }
-
     .suggestion-item:last-child { border-bottom: none; }
     .suggestion-item:hover { background: #f5f5ff; }
     .suggestion-icon { font-size: 16px; }
@@ -99,152 +70,83 @@
     .suggestion-name { font-weight: 600; }
     .suggestion-addr { font-size: 11px; color: #888; margin-top: 2px; }
 
-    /* ── Bottom info panel ── */
     #info-panel {
-      position: absolute;
-      bottom: 20px;
-      left: 50%;
+      position: absolute; bottom: 20px; left: 50%;
       transform: translateX(-50%);
       z-index: 1000;
-      width: calc(100% - 32px);
-      max-width: 480px;
-      background: #fff;
-      border-radius: 18px;
+      width: calc(100% - 32px); max-width: 480px;
+      background: #fff; border-radius: 18px;
       padding: 16px 18px;
       box-shadow: 0 4px 24px rgba(0,0,0,0.2);
       display: none;
     }
-
     #info-panel.visible { display: block; }
 
     #route-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 10px;
     }
-
     #route-title { font-size: 15px; font-weight: 800; color: #1a1a2e; }
-    #route-meta { font-size: 12px; color: #6B7280; }
+    #route-meta  { font-size: 12px; color: #6B7280; }
 
-    #route-stats {
-      display: flex;
-      gap: 12px;
-      margin-bottom: 12px;
-    }
+    #route-stats { display: flex; gap: 12px; margin-bottom: 12px; }
 
     .stat-box {
-      flex: 1;
-      background: #f5f5ff;
-      border-radius: 10px;
-      padding: 10px;
-      text-align: center;
+      flex: 1; background: #f5f5ff; border-radius: 10px;
+      padding: 10px; text-align: center;
     }
-
     .stat-value { font-size: 18px; font-weight: 900; color: #4F46E5; }
     .stat-label { font-size: 10px; color: #888; margin-top: 2px; }
 
     #instruction-box {
-      background: #4F46E5;
-      border-radius: 12px;
-      padding: 12px 14px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 10px;
+      background: #4F46E5; border-radius: 12px;
+      padding: 12px 14px; display: flex;
+      align-items: center; gap: 12px; margin-bottom: 10px;
     }
-
     #turn-icon { font-size: 22px; }
     #turn-text { font-size: 13px; color: #fff; font-weight: 600; flex: 1; }
     #turn-dist { font-size: 12px; color: rgba(255,255,255,0.75); white-space: nowrap; }
 
-    #btn-row {
-      display: flex;
-      gap: 8px;
-    }
+    #btn-row { display: flex; gap: 8px; }
 
     #btn-start {
-      flex: 1;
-      background: #4F46E5;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      padding: 11px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
+      flex: 1; background: #4F46E5; color: #fff; border: none;
+      border-radius: 10px; padding: 11px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
     }
-
     #btn-clear {
-      background: #fee2e2;
-      color: #ef4444;
-      border: none;
-      border-radius: 10px;
-      padding: 11px 16px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
+      background: #fee2e2; color: #ef4444; border: none;
+      border-radius: 10px; padding: 11px 16px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
     }
 
-    /* ── My location button ── */
     #locate-btn {
-      position: absolute;
-      bottom: 160px;
-      right: 16px;
-      z-index: 1000;
-      width: 44px;
-      height: 44px;
-      background: #fff;
-      border: none;
-      border-radius: 12px;
-      font-size: 20px;
-      cursor: pointer;
+      position: absolute; bottom: 160px; right: 16px;
+      z-index: 1000; width: 44px; height: 44px;
+      background: #fff; border: none; border-radius: 12px;
+      font-size: 20px; cursor: pointer;
       box-shadow: 0 2px 12px rgba(0,0,0,0.2);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
     }
 
-    /* ── Helmet sync badge ── */
     #helmet-badge {
-      position: absolute;
-      top: 74px;
-      right: 16px;
-      z-index: 1000;
-      background: #fff;
-      border-radius: 10px;
-      padding: 6px 12px;
-      font-size: 12px;
-      font-weight: 700;
-      color: #6B7280;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.15);
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      position: absolute; top: 74px; right: 16px;
+      z-index: 1000; background: #fff; border-radius: 10px;
+      padding: 6px 12px; font-size: 12px; font-weight: 700;
+      color: #6B7280; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      display: flex; align-items: center; gap: 6px;
     }
-
     #helmet-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      animation: pulse 1.5s infinite;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #10b981; animation: pulse 1.5s infinite;
     }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    /* Leaflet routing panel — hide default, we use our own */
     .leaflet-routing-container { display: none !important; }
 
-    /* Custom user location marker */
     .user-marker {
-      width: 20px;
-      height: 20px;
-      background: #4F46E5;
-      border: 3px solid #fff;
+      width: 20px; height: 20px;
+      background: #4F46E5; border: 3px solid #fff;
       border-radius: 50%;
       box-shadow: 0 0 0 4px rgba(79,70,229,0.3);
     }
@@ -252,34 +154,24 @@
 </head>
 <body>
 
-  <!-- Map container -->
   <div id="map"></div>
 
-  <!-- Search bar -->
   <div id="search-container">
     <div id="search-box">
       <span id="search-icon">🔍</span>
-      <input
-        id="search-input"
-        type="text"
-        placeholder="Search destination..."
-        autocomplete="off"
-      />
+      <input id="search-input" type="text" placeholder="Search destination..." autocomplete="off" />
       <button id="search-btn">Go</button>
     </div>
     <div id="suggestions"></div>
   </div>
 
-  <!-- Helmet sync badge -->
   <div id="helmet-badge">
     <div id="helmet-dot"></div>
     <span id="helmet-status">Helmet Sync</span>
   </div>
 
-  <!-- My location button -->
   <button id="locate-btn" title="My Location">📍</button>
 
-  <!-- Bottom info panel -->
   <div id="info-panel">
     <div id="route-header">
       <div id="route-title">Route Found</div>
@@ -310,102 +202,66 @@
     </div>
   </div>
 
-  <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <!-- Leaflet Routing Machine -->
   <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
 
   <script>
-    // ── State ────────────────────────────────────────────────────────────────
     let map, userMarker, userCircle, routingControl
     let userLat = null, userLng = null
     let destLat = null, destLng = null
+    let destName = null
     let watchId = null
     let currentInstructions = []
     let currentStep = 0
     let navigationActive = false
     let searchTimeout = null
 
-    // ── Init map (default to Sri Lanka center) ───────────────────────────────
-    map = L.map('map', {
-      zoomControl: true,
-      attributionControl: false,
-    }).setView([7.8731, 80.7718], 8)
+    map = L.map('map', { zoomControl: true, attributionControl: false })
+          .setView([7.8731, 80.7718], 8)
 
-    // OpenStreetMap tiles (free, no API key)
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-    }).addTo(map)
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map)
 
-    // ── User location marker ──────────────────────────────────────────────────
     function placeUserMarker(lat, lng) {
       const icon = L.divIcon({
         className: '',
         html: '<div class="user-marker"></div>',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [20, 20], iconAnchor: [10, 10],
       })
-
       if (userMarker) {
         userMarker.setLatLng([lat, lng])
         userCircle.setLatLng([lat, lng])
       } else {
         userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
         userCircle = L.circle([lat, lng], {
-          radius: 40,
-          color: '#4F46E5',
-          fillColor: '#4F46E5',
-          fillOpacity: 0.15,
-          weight: 1,
+          radius: 40, color: '#4F46E5',
+          fillColor: '#4F46E5', fillOpacity: 0.15, weight: 1,
         }).addTo(map)
       }
     }
 
-    // ── Start GPS watch ───────────────────────────────────────────────────────
-    function startLocationWatch() {
-      if (!navigator.geolocation) {
-        alert('Geolocation is not supported.')
-        return
+    function postToApp(data) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data))
       }
+    }
 
+    function startLocationWatch() {
+      if (!navigator.geolocation) { alert('Geolocation not supported.'); return }
       watchId = navigator.geolocation.watchPosition(
         (pos) => {
           userLat = pos.coords.latitude
           userLng = pos.coords.longitude
-          const speed = pos.coords.speed
-            ? Math.round(pos.coords.speed * 3.6)
-            : 0
-
+          const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0
           placeUserMarker(userLat, userLng)
           document.getElementById('stat-speed').textContent = speed
-
-          // Send location to React Native (phone app)
-          if (window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'location',
-              lat: userLat,
-              lng: userLng,
-              speed,
-            }))
-          }
-
-          // Auto-advance navigation steps
-          if (navigationActive && currentInstructions.length > 0) {
-            updateNavigationStep()
-          }
+          postToApp({ type: 'location', lat: userLat, lng: userLng, speed })
+          if (navigationActive && currentInstructions.length > 0) updateNavigationStep()
         },
-        (err) => {
-          console.warn('GPS error:', err.message)
-        },
-        {
-          enableHighAccuracy: true,
-          maximumAge: 2000,
-          timeout: 10000,
-        }
+        (err) => console.warn('GPS error:', err.message),
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
       )
     }
 
-    // ── Center on user ────────────────────────────────────────────────────────
     function centerOnUser() {
       if (userLat !== null) {
         map.setView([userLat, userLng], 16)
@@ -421,40 +277,30 @@
 
     document.getElementById('locate-btn').addEventListener('click', centerOnUser)
 
-    // ── Geocoding search (Nominatim — free, no API key) ───────────────────────
     async function searchLocation(query) {
       if (!query.trim()) return
       const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
       try {
-        const res = await fetch(url, {
-          headers: { 'Accept-Language': 'en' }
-        })
+        const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } })
         const data = await res.json()
         showSuggestions(data)
-      } catch (e) {
-        console.error('Search error:', e)
-      }
+      } catch (e) { console.error('Search error:', e) }
     }
 
     function showSuggestions(results) {
       const box = document.getElementById('suggestions')
       box.innerHTML = ''
-      if (!results.length) {
-        box.style.display = 'none'
-        return
-      }
+      if (!results.length) { box.style.display = 'none'; return }
       results.forEach(r => {
         const item = document.createElement('div')
         item.className = 'suggestion-item'
         const name = r.name || r.display_name.split(',')[0]
-        const addr = r.display_name
         item.innerHTML = `
           <span class="suggestion-icon">📍</span>
           <div class="suggestion-text">
             <div class="suggestion-name">${name}</div>
-            <div class="suggestion-addr">${addr}</div>
-          </div>
-        `
+            <div class="suggestion-addr">${r.display_name}</div>
+          </div>`
         item.addEventListener('click', () => {
           selectDestination(parseFloat(r.lat), parseFloat(r.lon), name)
           document.getElementById('search-input').value = name
@@ -465,51 +311,38 @@
       box.style.display = 'block'
     }
 
-    // ── Select destination & build route ─────────────────────────────────────
     function selectDestination(lat, lng, name) {
-      destLat = lat
-      destLng = lng
-
+      destLat  = lat
+      destLng  = lng
+      destName = name
       if (!userLat) {
         navigator.geolocation.getCurrentPosition((pos) => {
           userLat = pos.coords.latitude
           userLng = pos.coords.longitude
           placeUserMarker(userLat, userLng)
           buildRoute(name)
-        }, () => {
-          alert('Could not get your location. Please enable GPS.')
-        }, { enableHighAccuracy: true })
+        }, () => alert('Could not get your location. Please enable GPS.'), { enableHighAccuracy: true })
       } else {
         buildRoute(name)
       }
     }
 
-    function buildRoute(destName) {
-      // Remove existing route
-      if (routingControl) {
-        map.removeControl(routingControl)
-        routingControl = null
-      }
+    function buildRoute(name) {
+      if (routingControl) { map.removeControl(routingControl); routingControl = null }
 
       routingControl = L.Routing.control({
-        waypoints: [
-          L.latLng(userLat, userLng),
-          L.latLng(destLat, destLng),
-        ],
+        waypoints: [ L.latLng(userLat, userLng), L.latLng(destLat, destLng) ],
         routeWhileDragging: false,
         addWaypoints: false,
         fitSelectedRoutes: true,
-        lineOptions: {
-          styles: [{ color: '#4F46E5', weight: 5, opacity: 0.9 }],
-        },
+        lineOptions: { styles: [{ color: '#4F46E5', weight: 5, opacity: 0.9 }] },
         createMarker: (i, wp) => {
-          if (i === 0) return null // user marker already shown
+          if (i === 0) return null
           return L.marker(wp.latLng, {
             icon: L.divIcon({
               className: '',
               html: '<div style="background:#ef4444;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>',
-              iconSize: [14, 14],
-              iconAnchor: [7, 7],
+              iconSize: [14, 14], iconAnchor: [7, 7],
             })
           })
         },
@@ -520,45 +353,43 @@
       }).addTo(map)
 
       routingControl.on('routesfound', (e) => {
-        const route = e.routes[0]
-        const distKm = (route.summary.totalDistance / 1000).toFixed(1)
-        const mins   = Math.round(route.summary.totalTime / 60)
-        const hrs    = Math.floor(mins / 60)
-        const remMin = mins % 60
+        const route   = e.routes[0]
+        const distKm  = (route.summary.totalDistance / 1000).toFixed(1)
+        const mins    = Math.round(route.summary.totalTime / 60)
+        const hrs     = Math.floor(mins / 60)
+        const remMin  = mins % 60
         const timeStr = hrs > 0 ? `${hrs}h ${remMin}m` : `${mins}m`
 
         document.getElementById('stat-dist').textContent = `${distKm}km`
         document.getElementById('stat-time').textContent = timeStr
-        document.getElementById('route-meta').textContent = destName || 'Destination'
+        document.getElementById('route-meta').textContent = name || 'Destination'
 
         currentInstructions = route.instructions || []
         currentStep = 0
         showStep(0)
 
-        // Send route to React Native (for helmet sync)
-        if (window.ReactNativeWebView) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'route',
-            distance: distKm,
-            duration: timeStr,
-            destination: destName,
-            steps: currentInstructions.map(s => ({
-              text: s.text,
-              distance: Math.round(s.distance),
-              type: s.type,
-            }))
+        // ── Send route WITH destLat/destLng so WeatherCard can fetch destination weather ──
+        postToApp({
+          type:        'route',
+          destination: name,
+          destLat:     destLat,       // ← destination coordinates for weather
+          destLng:     destLng,       // ← destination coordinates for weather
+          distKm:      distKm,
+          etaMin:      mins,
+          steps: currentInstructions.map(s => ({
+            text:     s.text,
+            distance: Math.round(s.distance),
+            type:     s.type,
           }))
-        }
+        })
 
-        const panel = document.getElementById('info-panel')
-        panel.classList.add('visible')
+        document.getElementById('info-panel').classList.add('visible')
       })
     }
 
-    // ── Show navigation step ──────────────────────────────────────────────────
     function showStep(index) {
       if (!currentInstructions.length) return
-      const step = currentInstructions[Math.min(index, currentInstructions.length - 1)]
+      const step  = currentInstructions[Math.min(index, currentInstructions.length - 1)]
       const icons = {
         'Straight': '⬆️', 'SlightRight': '↗️', 'Right': '➡️',
         'SharpRight': '↪️', 'TurnAround': '🔄', 'SharpLeft': '↩️',
@@ -574,14 +405,7 @@
       document.getElementById('turn-text').textContent = step.text
       document.getElementById('turn-dist').textContent = dist
 
-      if (window.ReactNativeWebView) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'step',
-          icon,
-          text: step.text,
-          distance: dist,
-        }))
-      }
+      postToApp({ type: 'step', arrow: icon, text: step.text, dist })
     }
 
     function updateNavigationStep() {
@@ -598,17 +422,18 @@
         document.getElementById('turn-text').textContent = 'You have arrived!'
         document.getElementById('turn-dist').textContent = ''
         navigationActive = false
+        // Tell the app navigation is complete
+        postToApp({ type: 'arrived', destination: destName })
       }
     }
 
-    // ── Buttons ───────────────────────────────────────────────────────────────
     document.getElementById('btn-start').addEventListener('click', () => {
       if (!routingControl) return
       navigationActive = true
       currentStep = 0
       showStep(0)
       if (userLat) map.setView([userLat, userLng], 17)
-      document.getElementById('btn-start').textContent = '🧭 Navigating...'
+      document.getElementById('btn-start').textContent  = '🧭 Navigating...'
       document.getElementById('btn-start').style.background = '#10b981'
     })
 
@@ -621,45 +446,31 @@
       navigationActive = false
       currentInstructions = []
       currentStep = 0
-      destLat = null; destLng = null
+      destLat = null; destLng = null; destName = null
+
+      // ── Tell the app route was cleared so WeatherCard removes destination ──
+      postToApp({ type: 'clear' })
     })
 
-    // ── Search input ──────────────────────────────────────────────────────────
     const searchInput = document.getElementById('search-input')
-    const searchBtn   = document.getElementById('search-btn')
-
     searchInput.addEventListener('input', () => {
       clearTimeout(searchTimeout)
       const q = searchInput.value.trim()
-      if (q.length < 2) {
-        document.getElementById('suggestions').style.display = 'none'
-        return
-      }
+      if (q.length < 2) { document.getElementById('suggestions').style.display = 'none'; return }
       searchTimeout = setTimeout(() => searchLocation(q), 400)
     })
-
-    searchBtn.addEventListener('click', () => {
-      searchLocation(searchInput.value)
-    })
-
-    searchInput.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') searchLocation(searchInput.value)
-    })
-
-    // Close suggestions when clicking outside
+    document.getElementById('search-btn').addEventListener('click', () => searchLocation(searchInput.value))
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchLocation(searchInput.value) })
     document.addEventListener('click', (e) => {
-      if (!document.getElementById('search-container').contains(e.target)) {
+      if (!document.getElementById('search-container').contains(e.target))
         document.getElementById('suggestions').style.display = 'none'
-      }
     })
 
-    // ── Listen for messages from React Native (location updates, helmet sync) ─
     window.addEventListener('message', (e) => {
       try {
         const msg = JSON.parse(e.data)
         if (msg.type === 'location' && msg.lat && msg.lng) {
-          userLat = msg.lat
-          userLng = msg.lng
+          userLat = msg.lat; userLng = msg.lng
           placeUserMarker(userLat, userLng)
         }
         if (msg.type === 'helmetConnected') {
@@ -673,7 +484,6 @@
       } catch (_) {}
     })
 
-    // ── Auto-start GPS + center on user ──────────────────────────────────────
     startLocationWatch()
     setTimeout(centerOnUser, 1000)
   </script>

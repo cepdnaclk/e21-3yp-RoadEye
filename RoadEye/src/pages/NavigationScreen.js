@@ -23,7 +23,7 @@ export default function NavigationScreen({ navigation }) {
 
   const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
 
-  // ── GPS ────────────────────────────────────────────────────────────────────
+  // ── GPS ──────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
     if (status !== 'granted') {
@@ -45,17 +45,24 @@ export default function NavigationScreen({ navigation }) {
     )
   }, [])
 
-  // ── WebView messages ───────────────────────────────────────────────────────
+  // ── WebView messages ─────────────────────────────────────────────────────
   const onWebViewMessage = useCallback(async (event) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data)
 
       if (msg.type === 'route') {
+        // Start persistent background session
         sessionActive.current = true
         await startNavSession({
           destination: { name: msg.destination, lat: msg.destLat, lng: msg.destLng },
           distKm: msg.distKm,
           etaMin: msg.etaMin,
+        })
+        // Show destination weather in WeatherCard
+        setDestinationWeatherTarget({
+          lat:  msg.destLat,
+          lng:  msg.destLng,
+          name: msg.destination,
         })
       }
 
@@ -63,28 +70,17 @@ export default function NavigationScreen({ navigation }) {
         updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
       }
 
-      if (msg.type === 'clear') {
+      if (msg.type === 'clear' || msg.type === 'arrived') {
+        // Stop session and remove destination weather
         sessionActive.current = false
         await stopNavSession()
-      }
-
-      // When a route is set, update the weather card
-      if (msg.type === 'route') {
-        setDestinationWeatherTarget({
-          lat: destLat,
-          lng: destLng,
-          name: msg.destination,
-        })
-      }
-      // When route is cleared, remove destination weather
-      if (msg.type === 'clear') {
         setDestinationWeatherTarget(null)
       }
 
     } catch (_) {}
   }, [])
 
-  // ── Handle app going to background ────────────────────────────────────────
+  // ── Handle app going to background ──────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
@@ -103,18 +99,18 @@ export default function NavigationScreen({ navigation }) {
     return () => sub.remove()
   }, [startGPS])
 
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
     if (existing.active) sessionActive.current = true
     startGPS()
     return () => {
       locationSub.current?.remove()
-      // Do NOT call stopNavSession here — session must survive screen unmount
+      // Do NOT stop session — must survive screen unmount
     }
   }, [])
 
-  // ── Inject into WebView ────────────────────────────────────────────────────
+  // ── Inject into WebView ───────────────────────────────────────────────────
   const injectMessage = useCallback((data) => {
     const script = `
       try {
@@ -127,7 +123,7 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(script)
   }, [])
 
-  // ── Back — keep session alive ──────────────────────────────────────────────
+  // ── Back — keep session alive ─────────────────────────────────────────────
   const handleBack = () => {
     if (sessionActive.current) {
       Alert.alert(
@@ -139,6 +135,7 @@ export default function NavigationScreen({ navigation }) {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
               await stopNavSession()
+              setDestinationWeatherTarget(null)
               sessionActive.current = false
               navigation.goBack()
             },
