@@ -4,17 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
 
-/**
- * Ride entity - represents a single ride/trip
- */
 @Entity
 @Table(name = "rides")
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class Ride {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -23,50 +19,48 @@ public class Ride {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false)
-    private LocalDateTime startedAt;
+    @Column(name = "start_time", nullable = false)
+    private LocalDateTime startTime;
 
-    @Column(nullable = false)
-    private LocalDateTime endedAt;
+    @Column(name = "end_time")
+    private LocalDateTime endTime;
 
-    @Column(nullable = false)
+    @Column(name = "start_latitude")
+    private Double startLatitude;
+
+    @Column(name = "start_longitude")
+    private Double startLongitude;
+
+    @Column(name = "end_latitude")
+    private Double endLatitude;
+
+    @Column(name = "end_longitude")
+    private Double endLongitude;
+
+    @Column(name = "distance_km")
     private Double distanceKm;
 
-    @Column(columnDefinition = "DECIMAL(5,2) DEFAULT 0")
-    private Double avgSpeedKmh = 0.0;
+    @Column(name = "duration_minutes")
+    private Integer durationMinutes;
 
-    @Column(columnDefinition = "DECIMAL(5,2) DEFAULT 0")
-    private Double maxSpeedKmh = 0.0;
+    @Column(name = "avg_speed_kmh")
+    private Double avgSpeedKmh;
 
-    @Column(columnDefinition = "INTEGER DEFAULT 0")
-    private Integer harshBrakes = 0;
+    @Column(name = "max_speed_kmh")
+    private Double maxSpeedKmh;
 
-    @Column(columnDefinition = "INTEGER DEFAULT 0")
-    private Integer harshAccels = 0;
+    @Column(name = "route_data")
+    @Lob
+    private String routeData;
 
-    @Column(columnDefinition = "INTEGER DEFAULT 0")
-    private Integer aggressiveTilts = 0;
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt = LocalDateTime.now();
 
-    @Column(columnDefinition = "DECIMAL(3,1) DEFAULT 0")
-    private Double roadQualityScore = 0.0;
-
-    @Column(columnDefinition = "DECIMAL(3,1) DEFAULT 100")
-    private Double safetyScore = 100.0;
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
-    @Column(nullable = false)
-    private LocalDateTime updatedAt;
-
-    @PrePersist
-    public void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
-    }
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt = LocalDateTime.now();
 
     @PreUpdate
-    public void onUpdate() {
-        this.updatedAt = LocalDateTime.now();
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
     }
 }
