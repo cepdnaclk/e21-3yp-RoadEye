@@ -16,7 +16,7 @@ spring:
   # JPA/Hibernate Configuration
   jpa:
     hibernate:
-      ddl-auto: validate # Validate existing schema
+      ddl-auto: none # Use existing schema without validation
     properties:
       hibernate:
         format_sql: true
