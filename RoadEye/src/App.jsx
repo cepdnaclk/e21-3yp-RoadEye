@@ -1,5 +1,5 @@
 import { NavigationContainer } from '@react-navigation/native'
-import { createStackNavigator } from '@react-navigation/stack'   // JS stack — supports detachInactiveScreens
+import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { ActivityIndicator, View } from 'react-native'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import LoginPage        from './pages/LoginPage'
@@ -8,7 +8,7 @@ import DashboardPage    from './pages/DashboardPage'
 import EmergencyPage    from './pages/EmergencyPage'
 import NavigationScreen from './pages/NavigationScreen'
 
-const Stack = createStackNavigator()
+const Stack = createNativeStackNavigator()
 
 function RootNavigator() {
   const { isLoggedIn, isLoading } = useAuth()
