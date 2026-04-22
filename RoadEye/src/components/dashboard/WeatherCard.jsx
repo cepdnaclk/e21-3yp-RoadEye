@@ -1,3 +1,4 @@
+// src/components/dashboard/WeatherCard.jsx
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import * as Location from 'expo-location'
@@ -5,7 +6,7 @@ import { colors } from '../../utils/theme'
 
 const C = colors
 
-// ── Open-Meteo — free, no API key ──────────────────────────────────────────
+// ── Open-Meteo — free, no API key ─────────────────────────────────────────
 const fetchWeather = async (lat, lng) => {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
@@ -13,15 +14,15 @@ const fetchWeather = async (lat, lng) => {
     `&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`
   const res  = await fetch(url)
   const data = await res.json()
-  const c    = data.current
-  const d    = data.daily
+  const c = data.current
+  const d = data.daily
   return {
-    temp:      Math.round(c.temperature_2m),
-    humidity:  c.relative_humidity_2m,
-    wind:      Math.round(c.wind_speed_10m),
-    code:      c.weather_code,
-    high:      Math.round(d.temperature_2m_max[0]),
-    low:       Math.round(d.temperature_2m_min[0]),
+    temp:     Math.round(c.temperature_2m),
+    humidity: c.relative_humidity_2m,
+    wind:     Math.round(c.wind_speed_10m),
+    code:     c.weather_code,
+    high:     Math.round(d.temperature_2m_max[0]),
+    low:      Math.round(d.temperature_2m_min[0]),
   }
 }
 
@@ -35,55 +36,57 @@ const reverseGeocode = async (lat, lng) => {
   } catch { return 'Your Location' }
 }
 
-// WMO weather codes → emoji + label
 const wmoIcon = (code) => {
-  if (code === 0)               return { icon: '☀️',  label: 'Clear' }
-  if (code <= 2)                return { icon: '🌤️', label: 'Partly Cloudy' }
-  if (code === 3)               return { icon: '☁️',  label: 'Overcast' }
-  if (code <= 49)               return { icon: '🌫️', label: 'Foggy' }
-  if (code <= 59)               return { icon: '🌦️', label: 'Drizzle' }
-  if (code <= 69)               return { icon: '🌧️', label: 'Rain' }
-  if (code <= 79)               return { icon: '❄️',  label: 'Snow' }
-  if (code <= 84)               return { icon: '🌧️', label: 'Showers' }
-  if (code <= 94)               return { icon: '⛈️',  label: 'Thunderstorm' }
-  return                               { icon: '⛈️',  label: 'Storm' }
+  if (code === 0)   return { icon: '☀️',  label: 'Clear' }
+  if (code <= 2)    return { icon: '🌤️', label: 'Partly Cloudy' }
+  if (code === 3)   return { icon: '☁️',  label: 'Overcast' }
+  if (code <= 49)   return { icon: '🌫️', label: 'Foggy' }
+  if (code <= 59)   return { icon: '🌦️', label: 'Drizzle' }
+  if (code <= 69)   return { icon: '🌧️', label: 'Rain' }
+  if (code <= 79)   return { icon: '❄️',  label: 'Snow' }
+  if (code <= 84)   return { icon: '🌧️', label: 'Showers' }
+  if (code <= 94)   return { icon: '⛈️',  label: 'Thunderstorm' }
+  return                   { icon: '⛈️',  label: 'Storm' }
 }
 
-// Shared event bus — NavigationScreen calls this when destination changes
-// Usage from NavigationScreen.js:
-//   import { setDestinationWeatherTarget } from '../components/dashboard/WeatherCard'
-//   setDestinationWeatherTarget({ lat, lng, name })   // when route set
-//   setDestinationWeatherTarget(null)                  // when route cleared
+// ── Global destination event bus ───────────────────────────────────────────
+// NavigationScreen calls setDestinationWeatherTarget({ lat, lng, name })
+// when a route starts, and setDestinationWeatherTarget(null) when cleared.
 let _destListener = null
 export const setDestinationWeatherTarget = (target) => {
   if (_destListener) _destListener(target)
 }
 
-// ── COMPONENT ──────────────────────────────────────────────────────────────
+// ── COMPONENT ─────────────────────────────────────────────────────────────
 export default function WeatherCard() {
-  const [origin, setOrigin]   = useState(null)   // { temp, humidity, wind, code, high, low, name }
-  const [dest,   setDest]     = useState(null)   // same shape + name
-  const [loading, setLoading] = useState(true)
+  const [origin,      setOrigin]      = useState(null)
+  const [dest,        setDest]        = useState(null)
+  const [loading,     setLoading]     = useState(true)
   const [destLoading, setDestLoading] = useState(false)
   const refreshTimer = useRef(null)
-  const destTarget   = useRef(null)
 
-  // Register destination listener
+  // ── Destination listener ─────────────────────────────────────────────────
   useEffect(() => {
     _destListener = async (target) => {
-      destTarget.current = target
-      if (!target) { setDest(null); setDestLoading(false); return }
+      if (!target) {
+        setDest(null)
+        setDestLoading(false)
+        return
+      }
       setDestLoading(true)
       try {
         const w = await fetchWeather(target.lat, target.lng)
         setDest({ ...w, name: target.name || 'Destination' })
-      } catch { setDest(null) }
-      finally { setDestLoading(false) }
+      } catch {
+        setDest(null)
+      } finally {
+        setDestLoading(false)
+      }
     }
     return () => { _destListener = null }
   }, [])
 
-  // Fetch origin weather (live location)
+  // ── Origin weather (live location, refreshes every 1 min) ────────────────
   const loadOrigin = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
@@ -92,11 +95,11 @@ export default function WeatherCard() {
         setLoading(false)
         return
       }
-      const loc  = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
       const { latitude: lat, longitude: lng } = loc.coords
       const [w, name] = await Promise.all([fetchWeather(lat, lng), reverseGeocode(lat, lng)])
       setOrigin({ ...w, name })
-    } catch (e) {
+    } catch {
       setOrigin({ temp: '--', humidity: '--', wind: '--', code: 0, high: '--', low: '--', name: 'Unavailable' })
     } finally {
       setLoading(false)
@@ -105,11 +108,11 @@ export default function WeatherCard() {
 
   useEffect(() => {
     loadOrigin()
-    // Refresh every 10 minutes
-    refreshTimer.current = setInterval(loadOrigin, 10 * 60 * 1000)
+    refreshTimer.current = setInterval(loadOrigin, 60 * 1000)
     return () => clearInterval(refreshTimer.current)
   }, [])
 
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={[styles.card, styles.loadingCard]}>
@@ -121,48 +124,88 @@ export default function WeatherCard() {
 
   const hasDest = !!dest || destLoading
 
+  // ── No destination: full-width single card ────────────────────────────────
+  if (!hasDest) {
+    return (
+      <View style={styles.card}>
+        <FullWeatherBlock data={origin} />
+      </View>
+    )
+  }
+
+  // ── Destination active: split two-column card ─────────────────────────────
   return (
     <View style={styles.card}>
-      {/* ── Origin ── */}
-      <WeatherBlock data={origin} label="MY LOCATION" accent="#5B47E0" />
-
-      {/* ── Divider (only when destination present) ── */}
-      {hasDest && <View style={styles.divider} />}
-
-      {/* ── Destination ── */}
-      {destLoading && (
+      <SplitWeatherBlock data={origin} label="MY LOCATION" accent="#5B47E0" />
+      <View style={styles.divider} />
+      {destLoading ? (
         <View style={styles.destLoading}>
           <ActivityIndicator size="small" color="#E05B47" />
           <Text style={styles.destLoadingText}>Destination…</Text>
         </View>
-      )}
-      {dest && !destLoading && (
-        <WeatherBlock data={dest} label="DESTINATION" accent="#E05B47" />
+      ) : (
+        <SplitWeatherBlock data={dest} label="DESTINATION" accent="#E05B47" />
       )}
     </View>
   )
 }
 
-// ── Sub-component: one weather column ──────────────────────────────────────
-function WeatherBlock({ data, label, accent }) {
+// ── Full-width block (no destination) ────────────────────────────────────────
+function FullWeatherBlock({ data }) {
+  if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
   return (
-    <View style={styles.block}>
-      <Text style={[styles.blockLabel, { color: accent }]}>{label}</Text>
-      <Text style={styles.locationName} numberOfLines={1}>{data.name}</Text>
-
-      <View style={styles.tempRow}>
-        <Text style={styles.weatherIcon}>{icon}</Text>
-        <Text style={styles.temp}>{data.temp}°</Text>
-        <Text style={styles.unit}>C</Text>
+    <View style={styles.fullBlock}>
+      {/* Left: temp + condition */}
+      <View style={styles.fullLeft}>
+        <Text style={styles.fullTemp}>
+          {data.temp}°<Text style={styles.fullUnit}>C</Text>
+        </Text>
+        <Text style={styles.fullCondition}>{condition}</Text>
+        <Text style={styles.fullRange}>H: {data.high}°  L: {data.low}°</Text>
       </View>
 
-      <Text style={styles.condition}>{condition}</Text>
-      <Text style={styles.range}>H: {data.high}°  L: {data.low}°</Text>
+      {/* Middle: meta */}
+      <View style={styles.fullMeta}>
+        <View style={styles.fullMetaRow}>
+          <Text>💧</Text>
+          <Text style={styles.fullMetaLabel}>Humidity</Text>
+          <Text style={styles.fullMetaVal}>{data.humidity}%</Text>
+        </View>
+        <View style={styles.fullMetaRow}>
+          <Text>🌬️</Text>
+          <Text style={styles.fullMetaLabel}>Wind</Text>
+          <Text style={styles.fullMetaVal}>{data.wind} km/h</Text>
+        </View>
+        <Text style={styles.fullLocation} numberOfLines={1}>{data.name}</Text>
+      </View>
 
-      <View style={styles.metaRow}>
-        <Text style={styles.metaItem}>💧 {data.humidity}%</Text>
-        <Text style={styles.metaItem}>🌬️ {data.wind} km/h</Text>
+      {/* Right: icon */}
+      <View style={styles.fullIconBox}>
+        <Text style={styles.fullIcon}>{icon}</Text>
+      </View>
+    </View>
+  )
+}
+
+// ── Compact split block (with destination) ────────────────────────────────────
+function SplitWeatherBlock({ data, label, accent }) {
+  if (!data) return null
+  const { icon, label: condition } = wmoIcon(data.code || 0)
+  return (
+    <View style={styles.splitBlock}>
+      <Text style={[styles.splitLabel, { color: accent }]}>{label}</Text>
+      <Text style={styles.splitLocation} numberOfLines={1}>{data.name}</Text>
+      <View style={styles.splitTempRow}>
+        <Text style={styles.splitIcon}>{icon}</Text>
+        <Text style={styles.splitTemp}>{data.temp}°</Text>
+        <Text style={styles.splitUnit}>C</Text>
+      </View>
+      <Text style={styles.splitCondition}>{condition}</Text>
+      <Text style={styles.splitRange}>H: {data.high}°  L: {data.low}°</Text>
+      <View style={styles.splitMeta}>
+        <Text style={styles.splitMetaItem}>💧 {data.humidity}%</Text>
+        <Text style={styles.splitMetaItem}>🌬️ {data.wind} km/h</Text>
       </View>
     </View>
   )
@@ -176,64 +219,67 @@ const styles = StyleSheet.create({
     padding: 16,
     marginVertical: 10,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
-    gap: 0,
   },
   loadingCard: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 10,
-    minHeight: 80,
+    justifyContent: 'center', gap: 10, minHeight: 80,
   },
   loadingText: { fontSize: 12, color: C.muted },
 
-  // Blocks
-  block: { flex: 1, paddingHorizontal: 4 },
-  blockLabel: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    marginBottom: 2,
+  // ── Full block ──────────────────────────────────────────────────────────
+  fullBlock: {
+    flex: 1, flexDirection: 'row', alignItems: 'center',
   },
-  locationName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: C.muted,
-    marginBottom: 6,
+  fullLeft: { marginRight: 4 },
+  fullTemp: { fontSize: 32, fontWeight: '800', color: C.text, lineHeight: 36 },
+  fullUnit: { fontSize: 11, color: C.muted },
+  fullCondition: { fontSize: 12, fontWeight: '600', color: C.text, marginTop: 4 },
+  fullRange: { fontSize: 10, color: C.muted },
+
+  fullMeta: { flex: 1, paddingLeft: 20, gap: 6 },
+  fullMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fullMetaLabel: { fontSize: 12, fontWeight: '600', color: C.text },
+  fullMetaVal: { fontSize: 12, fontWeight: '700', color: C.text, marginLeft: 'auto' },
+  fullLocation: { fontSize: 10, color: C.muted, marginTop: 6 },
+
+  fullIconBox: {
+    width: 52, height: 52, borderRadius: 14,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center', justifyContent: 'center', marginLeft: 12,
   },
+  fullIcon: { fontSize: 26 },
 
-  tempRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 4, marginBottom: 2 },
-  weatherIcon: { fontSize: 24, lineHeight: 32 },
-  temp:  { fontSize: 30, fontWeight: '800', color: C.text, lineHeight: 34 },
-  unit:  { fontSize: 11, color: C.muted, marginBottom: 4 },
+  // ── Split blocks ────────────────────────────────────────────────────────
+  splitBlock: { flex: 1, paddingHorizontal: 4 },
+  splitLabel: {
+    fontSize: 9, fontWeight: '800',
+    letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2,
+  },
+  splitLocation: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 5 },
+  splitTempRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginBottom: 2 },
+  splitIcon: { fontSize: 22, lineHeight: 30 },
+  splitTemp: { fontSize: 28, fontWeight: '800', color: C.text, lineHeight: 32 },
+  splitUnit: { fontSize: 10, color: C.muted, marginBottom: 3 },
+  splitCondition: { fontSize: 11, fontWeight: '600', color: C.text },
+  splitRange: { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 5 },
+  splitMeta: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  splitMetaItem: { fontSize: 10, color: C.text, fontWeight: '500' },
 
-  condition: { fontSize: 11, fontWeight: '600', color: C.text },
-  range:     { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 6 },
-
-  metaRow:  { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  metaItem: { fontSize: 10, color: C.text, fontWeight: '500' },
-
-  // Divider
+  // ── Divider ─────────────────────────────────────────────────────────────
   divider: {
-    width: 1,
-    alignSelf: 'stretch',
-    backgroundColor: '#E5E7EB',
-    marginHorizontal: 8,
+    width: 1, alignSelf: 'stretch',
+    backgroundColor: '#E5E7EB', marginHorizontal: 8,
   },
 
-  // Dest loading state
+  // ── Dest loading ────────────────────────────────────────────────────────
   destLoading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingHorizontal: 4,
+    flex: 1, alignItems: 'center',
+    justifyContent: 'center', gap: 8, paddingHorizontal: 4,
   },
   destLoadingText: { fontSize: 11, color: C.muted },
 })
