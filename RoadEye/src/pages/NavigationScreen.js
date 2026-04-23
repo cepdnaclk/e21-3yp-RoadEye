@@ -12,18 +12,33 @@ import {
   updateNavStep,
   updateNavSpeed,
   getNavState,
+  setDestinationWeatherTarget,
 } from '../utils/NavigationSession'
-import { setDestinationWeatherTarget } from '../components/dashboard/WeatherCard'
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
   const sessionActive = useRef(false)
+  const webViewReady  = useRef(false)   // guard so we don't inject before load
 
   const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
 
-  // ── GPS ──────────────────────────────────────────────────────────────────
+  // ── Inject helper ─────────────────────────────────────────────────────────
+  const injectMessage = useCallback((data) => {
+    if (!webViewReady.current) return
+    const script = `
+      try {
+        window.dispatchEvent(new MessageEvent('message', {
+          data: ${JSON.stringify(JSON.stringify(data))}
+        }));
+      } catch(e) {}
+      true;
+    `
+    webViewRef.current?.injectJavaScript(script)
+  }, [])
+
+  // ── GPS ───────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
     if (status !== 'granted') {
@@ -33,6 +48,7 @@ export default function NavigationScreen({ navigation }) {
       return
     }
     setGpsStatus('GPS acquiring…')
+    locationSub.current?.remove()   // clear any stale sub
     locationSub.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
       (loc) => {
@@ -43,22 +59,49 @@ export default function NavigationScreen({ navigation }) {
         injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
       }
     )
-  }, [])
+  }, [injectMessage])
 
-  // ── WebView messages ─────────────────────────────────────────────────────
+  // ── WebView ready — restore existing session OR start fresh GPS ───────────
+  const onWebViewLoad = useCallback(() => {
+    webViewReady.current = true
+    const existing = getNavState()
+    if (existing.active && existing.destination) {
+      sessionActive.current = true
+
+      // Restore weather card immediately
+      setDestinationWeatherTarget({
+        lat:  existing.destination.lat,
+        lng:  existing.destination.lng,
+        name: existing.destination.name,
+      })
+
+      // Small delay so the map JS finishes attaching its message listener
+      setTimeout(() => {
+        injectMessage({
+          type:        'restoreRoute',
+          destination: existing.destination.name,
+          destLat:     existing.destination.lat,
+          destLng:     existing.destination.lng,
+          distKm:      existing.distKm,
+          etaMin:      existing.etaMin,
+        })
+      }, 500)
+    }
+    startGPS()
+  }, [startGPS, injectMessage])
+
+  // ── WebView messages ──────────────────────────────────────────────────────
   const onWebViewMessage = useCallback(async (event) => {
     try {
       const msg = JSON.parse(event.nativeEvent.data)
 
       if (msg.type === 'route') {
-        // Start persistent background session
         sessionActive.current = true
         await startNavSession({
           destination: { name: msg.destination, lat: msg.destLat, lng: msg.destLng },
           distKm: msg.distKm,
           etaMin: msg.etaMin,
         })
-        // Show destination weather in WeatherCard
         setDestinationWeatherTarget({
           lat:  msg.destLat,
           lng:  msg.destLng,
@@ -71,16 +114,14 @@ export default function NavigationScreen({ navigation }) {
       }
 
       if (msg.type === 'clear' || msg.type === 'arrived') {
-        // Stop session and remove destination weather
         sessionActive.current = false
-        await stopNavSession()
-        setDestinationWeatherTarget(null)
+        await stopNavSession()   // this also clears WeatherCard via NavigationSession
       }
 
     } catch (_) {}
   }, [])
 
-  // ── Handle app going to background ──────────────────────────────────────
+  // ── App background/foreground ─────────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
@@ -99,31 +140,19 @@ export default function NavigationScreen({ navigation }) {
     return () => sub.remove()
   }, [startGPS])
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
+  // ── Mount/unmount ─────────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
     if (existing.active) sessionActive.current = true
-    startGPS()
+    // GPS starts in onWebViewLoad — not here — so WebView is ready first
     return () => {
       locationSub.current?.remove()
+      webViewReady.current = false
       // Do NOT stop session — must survive screen unmount
     }
   }, [])
 
-  // ── Inject into WebView ───────────────────────────────────────────────────
-  const injectMessage = useCallback((data) => {
-    const script = `
-      try {
-        window.dispatchEvent(new MessageEvent('message', {
-          data: ${JSON.stringify(JSON.stringify(data))}
-        }));
-      } catch(e) {}
-      true;
-    `
-    webViewRef.current?.injectJavaScript(script)
-  }, [])
-
-  // ── Back — keep session alive ─────────────────────────────────────────────
+  // ── Back handler ──────────────────────────────────────────────────────────
   const handleBack = () => {
     if (sessionActive.current) {
       Alert.alert(
@@ -134,8 +163,7 @@ export default function NavigationScreen({ navigation }) {
           {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
-              await stopNavSession()
-              setDestinationWeatherTarget(null)
+              await stopNavSession()   // clears WeatherCard too
               sessionActive.current = false
               navigation.goBack()
             },
@@ -160,6 +188,7 @@ export default function NavigationScreen({ navigation }) {
         source={mapSource}
         style={styles.webview}
         onMessage={onWebViewMessage}
+        onLoad={onWebViewLoad}
         javaScriptEnabled
         domStorageEnabled
         geolocationEnabled
