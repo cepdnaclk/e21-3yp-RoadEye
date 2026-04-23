@@ -64,3 +64,6 @@ yarn.lock
 .project
 .c9/
 *.sublime-workspace
+
+# Expo
+.expo/
