@@ -25,7 +25,9 @@ import org.springframework.web.cors.CorsConfigurationSource;
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
-    private final JwtService jwtService;
+
+    // ✅ Inject filter properly via Spring
+    private final JwtAuthFilter jwtAuthFilter;
 
     /**
      * Main Spring Security filter chain configuration

@@ -1,5 +1,6 @@
 package com.roadeye.controller;
 
+import com.roadeye.dto.EmergencyContactDTO;
 import com.roadeye.model.EmergencyContact;
 import com.roadeye.service.EmergencyContactService;
 import lombok.RequiredArgsConstructor;
@@ -116,10 +117,12 @@ public class EmergencyContactController {
         return EmergencyContactDTO.builder()
                 .id(contact.getId())
                 .userId(contact.getUser().getId())
-                .name(contact.getName())
-                .phone(contact.getPhone())
+                .contactName(contact.getName())
+                .phoneNumber(contact.getPhone())
                 .email(contact.getEmail())
                 .relationship(contact.getRelationship())
+                .isPrimary(contact.getEnabled())
+                .createdAt(contact.getCreatedAt().toString())
                 .channel(contact.getChannel().name())
                 .enabled(contact.getEnabled())
                 .build();
@@ -149,6 +152,7 @@ public class EmergencyContactController {
         private Boolean enabled;
     }
 
+    /*
     @lombok.Data
     @lombok.Builder
     public static class EmergencyContactDTO {
@@ -161,4 +165,6 @@ public class EmergencyContactController {
         private String channel;
         private Boolean enabled;
     }
+}
+ */
 }
