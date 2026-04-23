@@ -78,3 +78,10 @@ ios/build/
 
 # ✅ TypeScript
 *.tsbuildinfo
+
+# ✅ MAVEN / SPRING BOOT BACKEND
+backend/target/
+backend/.mvn/
+*.class
+*.jar
+*.war
