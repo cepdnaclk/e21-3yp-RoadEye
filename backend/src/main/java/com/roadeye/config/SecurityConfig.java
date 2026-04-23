@@ -14,10 +14,14 @@ import lombok.RequiredArgsConstructor;
  */
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
+
+    public SecurityConfig(CorsConfigurationSource corsConfigurationSource) {
+        this.corsConfigurationSource = corsConfigurationSource;
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
