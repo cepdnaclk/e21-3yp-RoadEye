@@ -7,35 +7,36 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfigurationSource;
 import lombok.RequiredArgsConstructor;
+import com.roadeye.security.JwtAuthFilter;
+import com.roadeye.security.JwtService;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
  * Spring Security configuration
  * For now, we're allowing basic requests. Add JWT/OAuth2 authentication as needed.
  */
+@RequiredArgsConstructor
 @Configuration
 @EnableWebSecurity
-//@RequiredArgsConstructor
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
-
-    public SecurityConfig(CorsConfigurationSource corsConfigurationSource) {
-        this.corsConfigurationSource = corsConfigurationSource;
-    }
+    private final JwtService jwtService;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
+        JwtAuthFilter jwtAuthFilter = new JwtAuthFilter(jwtService);
+
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints
                         .requestMatchers("/api/users/register").permitAll()
-                        .requestMatchers("/api/health").permitAll()
-                        // All other endpoints require authentication (add when implementing JWT)
-                        .anyRequest().permitAll() // For now, allow all
+                        .requestMatchers("/api/users/login").permitAll()
+                        .anyRequest().authenticated() // 🔐 protect all other APIs
                 )
-                .httpBasic(httpBasic -> {});
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
