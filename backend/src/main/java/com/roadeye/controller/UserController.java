@@ -2,7 +2,7 @@ package com.roadeye.controller;
 
 import com.roadeye.model.User;
 import com.roadeye.service.UserService;
-import com.roadeye.security.JwtUtil; // NEW (JWT)
+import com.roadeye.security.JwtService; 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -23,7 +23,7 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
 
     //Inject JWT utility
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
 
     /**
      * REGISTER USER
@@ -62,7 +62,7 @@ public class UserController {
             }
 
             // 3. Generate JWT token
-            String token = jwtUtil.generateToken(user.getEmail());
+            String token = jwtService.generateToken(user.getEmail());
 
             // 4. Return token
             return ResponseEntity.ok(Map.of(

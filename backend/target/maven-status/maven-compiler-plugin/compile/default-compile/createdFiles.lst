@@ -1,5 +1,6 @@
 com\roadeye\dto\RideDTO.class
 com\roadeye\dto\EmergencyContactDTO.class
+com\roadeye\security\JwtAuthFilter.class
 com\roadeye\model\EmergencyContact.class
 com\roadeye\controller\UserController$UserDTO$UserDTOBuilder.class
 com\roadeye\controller\RideController.class
@@ -26,6 +27,7 @@ com\roadeye\repository\UserRepository.class
 com\roadeye\model\Ride$RideBuilder.class
 com\roadeye\controller\EmergencyContactController.class
 com\roadeye\controller\CrashEventController$ReportCrashRequest.class
+com\roadeye\controller\UserController$LoginRequest.class
 com\roadeye\service\RideService.class
 com\roadeye\controller\CrashEventController.class
 com\roadeye\dto\EmergencyContactDTO$EmergencyContactDTOBuilder.class
@@ -34,6 +36,7 @@ com\roadeye\dto\CrashEventDTO.class
 com\roadeye\controller\UserController$UpdateProfileRequest.class
 com\roadeye\controller\UserController$UserDTO.class
 com\roadeye\dto\UserDTO$UserDTOBuilder.class
+com\roadeye\security\JwtService.class
 com\roadeye\controller\UserController.class
 com\roadeye\service\CrashEventService$CrashStatistics.class
 com\roadeye\controller\EmergencyContactController$UpdateEmergencyContactRequest.class
