@@ -2,6 +2,7 @@
   "expo": {
     "name": "RoadEye",
     "slug": "roadeye",
+    "scheme": "com.roadeye.app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -23,7 +24,11 @@
         "BLUETOOTH",
         "BLUETOOTH_CONNECT",
         "BLUETOOTH_SCAN",
+        "READ_CONTACTS",
         "android.permission.ACCESS_COARSE_LOCATION",
+        "FOREGROUND_SERVICE",
+        "FOREGROUND_SERVICE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
@@ -32,11 +37,19 @@
       "bundleIdentifier": "com.roadeye.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "RoadEye needs your location for weather and ride tracking.",
-        "NSBluetoothAlwaysUsageDescription": "RoadEye uses Bluetooth to connect to your smart helmet."
+        "NSBluetoothAlwaysUsageDescription": "RoadEye uses Bluetooth to connect to your smart helmet.",
+        "NSContactsUsageDescription": "RoadEye needs access to your contacts for emergency settings."
       }
     },
     "plugins": [
-      "expo-location"
+      "expo-location",
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow RoadEye to access your contacts for emergency settings."
+        }
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

@@ -45,6 +45,9 @@ node_modules/
 .env
 .dataconnect
 
+# spotify
+.env
+
 # ✅ EXPO
 .expo/
 dist/
