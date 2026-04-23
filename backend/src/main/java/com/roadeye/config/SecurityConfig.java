@@ -1,12 +1,12 @@
 package com.roadeye.config;
 
 import com.roadeye.security.JwtAuthFilter;
-import com.roadeye.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfigurationSource;
@@ -26,7 +26,7 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
 
-    // ✅ Inject filter properly via Spring
+    // Inject filter properly via Spring
     private final JwtAuthFilter jwtAuthFilter;
 
     /**
@@ -36,7 +36,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         // Create JWT filter instance
-        JwtAuthFilter jwtAuthFilter = new JwtAuthFilter(jwtService);
+        //JwtAuthFilter jwtAuthFilter = new JwtAuthFilter(jwtService);
 
         http
             // Enable CORS (frontend access allowed)
@@ -44,6 +44,11 @@ public class SecurityConfig {
 
             // Disable CSRF (typical for REST APIs)
             .csrf(csrf -> csrf.disable())
+
+            // JWT = stateless system
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
 
             // Define authorization rules
             .authorizeHttpRequests(auth -> auth

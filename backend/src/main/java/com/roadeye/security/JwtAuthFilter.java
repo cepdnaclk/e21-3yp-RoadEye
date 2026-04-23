@@ -30,7 +30,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
-    @Autowired
+   //@Autowired
     public JwtAuthFilter(JwtService jwtService) {
         this.jwtService = jwtService;
     }
