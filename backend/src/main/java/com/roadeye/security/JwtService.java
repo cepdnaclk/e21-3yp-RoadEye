@@ -1,12 +1,12 @@
 package com.roadeye.security;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.Date;
 
 /**
@@ -20,32 +20,19 @@ import java.util.Date;
 @Service
 public class JwtService {
 
-    /**
-     * Secret key used for signing JWT tokens.
-     * ⚠ In production, store this in environment variables or config file.
-     */
-    private static final String SECRET_KEY =
-            "my-secret-key-roadeye-my-secret-key-roadeye-123456";
-
-    /**
-     * Convert secret key into cryptographic signing key
-     */
-    private Key getSignKey() {
-        byte[] keyBytes = Decoders.BASE64.decode(
-                java.util.Base64.getEncoder().encodeToString(SECRET_KEY.getBytes())
-        );
-        return Keys.hmacShaKeyFor(keyBytes);
-    }
+    // Secret key (change this in production!)
+    private final String SECRET_KEY = "my-secret-key-roadeye-secret-key-min-256-bits-long";
+    private final SecretKey key = Keys.hmacShaKeyFor(SECRET_KEY.getBytes());
 
     /**
      * Generate JWT token using user's email
      */
     public String generateToken(String email) {
         return Jwts.builder()
-                .setSubject(email) // store email as subject
-                .setIssuedAt(new Date()) // token creation time
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // 1 day validity
-                .signWith(getSignKey(), SignatureAlgorithm.HS256) // signing algorithm
+                .subject(email) // who the token belongs to
+                .issuedAt(new Date()) // current time
+                .expiration(new Date(System.currentTimeMillis() + 86400000)) // expires in 1 day
+                .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -53,12 +40,30 @@ public class JwtService {
      * Extract email (subject) from JWT token
      */
     public String extractEmail(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSignKey())
+        return getClaims(token).getSubject();
+    }
+
+    /**
+     * Validate JWT token
+     */
+    public boolean validateToken(String token) {
+        try {
+            getClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Get claims from token
+     */
+    private Claims getClaims(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
                 .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+                .parseSignedClaims(token)
+                .getPayload();
     }
 
     /**

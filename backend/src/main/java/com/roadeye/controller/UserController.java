@@ -2,7 +2,7 @@ package com.roadeye.controller;
 
 import com.roadeye.model.User;
 import com.roadeye.service.UserService;
-import com.roadeye.security.JwtService; 
+import com.roadeye.security.JwtService; // NEW (JWT)
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
