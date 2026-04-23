@@ -2,10 +2,13 @@ package com.roadeye.controller;
 
 import com.roadeye.model.User;
 import com.roadeye.service.UserService;
+import com.roadeye.security.JwtUtil; // NEW (JWT)
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder; 
 import org.springframework.web.bind.annotation.*;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,8 +19,14 @@ public class UserController {
 
     private final UserService userService;
 
+    //Inject password encoder
+    private final PasswordEncoder passwordEncoder;
+
+    //Inject JWT utility
+    private final JwtUtil jwtUtil;
+
     /**
-     * POST /api/users/register - Register a new user
+     * REGISTER USER
      */
     @PostMapping("/register")
     public ResponseEntity<?> registerUser(@RequestBody RegistrationRequest request) {
@@ -37,7 +46,38 @@ public class UserController {
     }
 
     /**
-     * GET /api/users/{userId} - Get user profile
+     * LOGIN USER (JWT AUTH)
+     */
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest request) {
+        try {
+            // 1. Find user by email
+            User user = userService.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+
+            // 2. Check password
+            if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid password"));
+            }
+
+            // 3. Generate JWT token
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            // 4. Return token
+            return ResponseEntity.ok(Map.of(
+                    "token", token,
+                    "user", toDTO(user)
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * GET USER PROFILE
      */
     @GetMapping("/{userId}")
     public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
@@ -47,14 +87,19 @@ public class UserController {
     }
 
     /**
-     * PUT /api/users/{userId} - Update user profile
+     * UPDATE USER PROFILE
      */
     @PutMapping("/{userId}")
     public ResponseEntity<?> updateProfile(
             @PathVariable Long userId,
             @RequestBody UpdateProfileRequest request) {
         try {
-            User user = userService.updateProfile(userId, request.getFirstName(), request.getLastName(), request.getPhoneNumber());
+            User user = userService.updateProfile(
+                    userId,
+                    request.getFirstName(),
+                    request.getLastName(),
+                    request.getPhoneNumber()
+            );
             return ResponseEntity.ok(toDTO(user));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -62,7 +107,7 @@ public class UserController {
     }
 
     /**
-     * DELETE /api/users/{userId} - Deactivate user
+     * DELETE (DEACTIVATE) USER
      */
     @DeleteMapping("/{userId}")
     public ResponseEntity<?> deactivateUser(@PathVariable Long userId) {
@@ -74,6 +119,9 @@ public class UserController {
         }
     }
 
+    /**
+     * Convert Entity → DTO
+     */
     private UserDTO toDTO(User user) {
         return UserDTO.builder()
                 .id(user.getId())
@@ -86,7 +134,11 @@ public class UserController {
                 .build();
     }
 
-    // DTOs
+    // ================= DTO CLASSES =================
+
+    /**
+     * REGISTER REQUEST
+     */
     @lombok.Data
     @lombok.AllArgsConstructor
     @lombok.NoArgsConstructor
@@ -97,6 +149,18 @@ public class UserController {
         private String lastName;
     }
 
+    /**
+     * ✅ NEW: LOGIN REQUEST
+     */
+    @lombok.Data
+    public static class LoginRequest {
+        private String email;
+        private String password;
+    }
+
+    /**
+     * UPDATE PROFILE REQUEST
+     */
     @lombok.Data
     @lombok.AllArgsConstructor
     @lombok.NoArgsConstructor
@@ -106,6 +170,9 @@ public class UserController {
         private String phoneNumber;
     }
 
+    /**
+     * RESPONSE DTO
+     */
     @lombok.Data
     @lombok.Builder
     public static class UserDTO {
