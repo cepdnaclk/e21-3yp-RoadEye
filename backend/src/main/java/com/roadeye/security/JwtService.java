@@ -29,9 +29,9 @@ public class JwtService {
      */
     public String generateToken(String email) {
         return Jwts.builder()
-                .subject(email) // who the token belongs to
-                .issuedAt(new Date()) // current time
-                .expiration(new Date(System.currentTimeMillis() + 86400000)) // expires in 1 day
+                .setSubject(email) // who the token belongs to
+                .setIssuedAt(new Date()) // current time
+                .setExpiration(new Date(System.currentTimeMillis() + 86400000)) // expires in 1 day
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }
@@ -48,6 +48,15 @@ public class JwtService {
      */
     public boolean validateToken(String token) {
         try {
+           /*Jwts.parser()
+                    .verifyWith(key)
+                    .build()
+                    .parseSignedClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    } */
             getClaims(token);
             return true;
         } catch (Exception e) {
@@ -59,16 +68,20 @@ public class JwtService {
      * Get claims from token
      */
     private Claims getClaims(String token) {
-        return Jwts.parser()
-                .verifyWith(key)
+        return Jwts.parserBuilder()
+        //return Jwts.parser()
+                .setSigningKey(key)
+                //.verifyWith(key)
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseClaimsJws(token)
+                .getBody();
+                //.parseSignedClaims(token)
+                //.getPayload();
     }
-
+    
     /**
      * Validate token (checks signature + expiration)
-     */
+    
     public boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
@@ -81,4 +94,6 @@ public class JwtService {
             return false; // invalid or expired token
         }
     }
+}
+ */
 }

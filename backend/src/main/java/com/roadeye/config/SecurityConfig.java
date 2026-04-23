@@ -1,19 +1,18 @@
 package com.roadeye.config;
 
+import lombok.RequiredArgsConstructor;
+import com.roadeye.security.JwtAuthFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.web.cors.CorsConfigurationSource;
-import lombok.RequiredArgsConstructor;
-import com.roadeye.security.JwtAuthFilter;
-import com.roadeye.security.JwtService;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 /**
- * Spring Security configuration
- * For now, we're allowing basic requests. Add JWT/OAuth2 authentication as needed.
+ * Spring Security configuration (JWT based)
  */
 @RequiredArgsConstructor
 @Configuration
@@ -21,21 +20,41 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
-    private final JwtService jwtService;
+
+    // ✅ Inject filter properly via Spring
+    private final JwtAuthFilter jwtAuthFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-        JwtAuthFilter jwtAuthFilter = new JwtAuthFilter(jwtService);
-
         http
+                // Enable CORS for frontend
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
+
+                // Disable CSRF (JWT apps don't need it)
                 .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/users/register").permitAll()
-                        .requestMatchers("/api/users/login").permitAll()
-                        .anyRequest().authenticated() // 🔐 protect all other APIs
+
+                // IMPORTANT: No sessions (JWT is stateless)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
+
+                // Authorization rules
+                .authorizeHttpRequests(auth -> auth
+                        // public endpoints
+                        .requestMatchers(
+                                "/api/users/register",
+                                "/api/users/login",
+                                "/",
+                                "/error",
+                                "/favicon.ico"
+                        ).permitAll()
+
+                        // everything else protected
+                        .anyRequest().authenticated()
+                )
+
+                // JWT filter
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

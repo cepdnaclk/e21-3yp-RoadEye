@@ -15,4 +15,6 @@ public class EmergencyContactDTO {
     private String relationship;
     private Boolean isPrimary;
     private String createdAt;
+    private String channel;
+    private Boolean enabled;
 }

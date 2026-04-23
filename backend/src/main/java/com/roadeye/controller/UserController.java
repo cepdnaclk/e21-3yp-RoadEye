@@ -14,7 +14,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
+//@RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
@@ -24,6 +24,15 @@ public class UserController {
 
     //Inject JWT utility
     private final JwtService jwtService;
+
+    //MANUAL CONSTRUCTOR (FIX)
+    public UserController(UserService userService,
+                          PasswordEncoder passwordEncoder,
+                          JwtService jwtService) {
+        this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+    }
 
     /**
      * REGISTER USER
