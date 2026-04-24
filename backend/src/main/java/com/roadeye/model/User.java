@@ -19,7 +19,8 @@ public class User {
 
     @Id
     @GeneratedValue
-    @Column(columnDefinition = "UUID")
+    //@Column(columnDefinition = "UUID")
+    @Column(columnDefinition = "uuid", updatable = false, nullable = false)
     private UUID id;
 
     @Column(unique = true, nullable = false)

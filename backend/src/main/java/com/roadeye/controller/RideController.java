@@ -36,7 +36,7 @@ public class RideController {
 
     @PostMapping("/{rideId}/end")
     public ResponseEntity<?> endRide(
-            @PathVariable Long rideId,
+            @PathVariable UUID rideId,
             @RequestBody EndRideRequest request) {
         try {
             Ride ride = rideService.endRide(rideId, request.getEndLatitude(),
@@ -54,7 +54,7 @@ public class RideController {
     }
 
     @GetMapping("/{rideId}")
-    public ResponseEntity<?> getRideById(@PathVariable Long rideId) {
+    public ResponseEntity<?> getRideById(@PathVariable UUID rideId) {
         try {
             Ride ride = rideService.getRideById(rideId);
             return ResponseEntity.ok(toDTO(ride));
@@ -64,7 +64,7 @@ public class RideController {
     }
 
     @DeleteMapping("/{rideId}")
-    public ResponseEntity<?> deleteRide(@PathVariable Long rideId) {
+    public ResponseEntity<?> deleteRide(@PathVariable UUID rideId) {
         rideService.deleteRide(rideId);
         return ResponseEntity.ok("Ride deleted successfully");
     }

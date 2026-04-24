@@ -7,10 +7,10 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface CrashEventRepository extends JpaRepository<CrashEvent, Long> {
+public interface CrashEventRepository extends JpaRepository<CrashEvent, UUID> {
     List<CrashEvent> findByUserId(UUID userId);
 
     List<CrashEvent> findByUserIdOrderByOccurredAtDesc(UUID userId);
 
-    List<CrashEvent> findByRideId(Long rideId);
+    List<CrashEvent> findByRideId(UUID rideId);
 }

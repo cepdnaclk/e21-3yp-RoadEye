@@ -63,7 +63,7 @@ public class CrashEventService {
     /**
      * Get crash event by ID
      */
-    public CrashEvent getCrashEventById(Long crashId) {
+    public CrashEvent getCrashEventById(UUID crashId) {
         return crashEventRepository.findById(crashId)
                 .orElseThrow(() -> new RuntimeException("Crash event not found"));
     }

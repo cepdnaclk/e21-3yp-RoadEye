@@ -35,7 +35,7 @@ public class RideService {
         return rideRepository.save(ride);
     }
 
-    public Ride endRide(Long rideId, Double endLatitude, Double endLongitude,
+    public Ride endRide(UUID rideId, Double endLatitude, Double endLongitude,
             Double distanceKm, Double avgSpeedKmh, Double maxSpeedKmh) {
         Ride ride = getRideById(rideId);
         ride.setEndTime(LocalDateTime.now());
@@ -54,7 +54,7 @@ public class RideService {
         return rideRepository.save(ride);
     }
 
-    public Ride getRideById(Long id) {
+    public Ride getRideById(UUID id) {
         return rideRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Ride not found with id: " + id));
     }
@@ -66,7 +66,7 @@ public class RideService {
                 .collect(Collectors.toList());
     }
 
-    public void deleteRide(Long id) {
+    public void deleteRide(UUID id) {
         rideRepository.deleteById(id);
     }
 

@@ -8,9 +8,9 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class CrashEventDTO {
-    private Long id;
+    private UUID id;
     private UUID userId;
-    private Long rideId;
+    private UUID rideId;
     private String occurredAt;
     private Double latitude;
     private Double longitude;

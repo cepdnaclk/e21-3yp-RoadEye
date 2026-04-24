@@ -68,7 +68,7 @@ public class EmergencyContactController {
      */
     @PutMapping("/{contactId}")
     public ResponseEntity<?> updateEmergencyContact(
-            @PathVariable Long contactId,
+            @PathVariable UUID contactId,
             @RequestBody UpdateEmergencyContactRequest request) {
         try {
             EmergencyContact contact = EmergencyContact.builder()
@@ -93,7 +93,7 @@ public class EmergencyContactController {
      * DELETE /api/emergency-contacts/{contactId} - Delete emergency contact
      */
     @DeleteMapping("/{contactId}")
-    public ResponseEntity<?> deleteEmergencyContact(@PathVariable Long contactId) {
+    public ResponseEntity<?> deleteEmergencyContact(@PathVariable UUID contactId) {
         try {
             emergencyContactService.deleteEmergencyContact(contactId);
             return ResponseEntity.ok("Contact deleted successfully");
@@ -107,7 +107,7 @@ public class EmergencyContactController {
      * status
      */
     @PatchMapping("/{contactId}/toggle")
-    public ResponseEntity<?> toggleContact(@PathVariable Long contactId) {
+    public ResponseEntity<?> toggleContact(@PathVariable UUID contactId) {
         try {
             EmergencyContact contact = emergencyContactService.toggleContact(contactId);
             return ResponseEntity.ok(toDTO(contact));

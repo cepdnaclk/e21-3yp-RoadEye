@@ -57,7 +57,7 @@ public class CrashEventController {
      * GET /api/crashes/{crashId} - Get specific crash event
      */
     @GetMapping("/{crashId}")
-    public ResponseEntity<?> getCrashEventById(@PathVariable Long crashId) {
+    public ResponseEntity<?> getCrashEventById(@PathVariable UUID crashId) {
         try {
             CrashEvent crash = crashEventService.getCrashEventById(crashId);
             return ResponseEntity.ok(toDTO(crash));
@@ -71,7 +71,7 @@ public class CrashEventController {
      */
     @PostMapping("/{crashId}/notify")
     public ResponseEntity<?> notifyEmergencyContacts(
-            @PathVariable Long crashId,
+            @PathVariable UUID crashId,
             @RequestParam UUID userId) {
         try {
             CrashEvent crash = crashEventService.getCrashEventById(crashId);
@@ -121,9 +121,9 @@ public class CrashEventController {
     @lombok.Data
     @lombok.Builder
     public static class CrashEventDTO {
-        private Long id;
+        private UUID id;
         private UUID userId;
-        private Long rideId;
+        private UUID rideId;
         private String occurredAt;
         private Double latitude;
         private Double longitude;
