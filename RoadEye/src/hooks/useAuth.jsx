@@ -5,24 +5,36 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading,  setIsLoading]  = useState(true)
+  const [isLoading,  setIsLoading]  = useState(true)  // ← App.jsx needs this
 
-  // On app open — check if already logged in
+  // Check for existing token when app starts
+  // This keeps the user logged in after closing and reopening the app
   useEffect(() => {
-    AsyncStorage.getItem('isLoggedIn')
-      .then(val => { if (val === 'true') setIsLoggedIn(true) })
-      .catch(() => {})
-      .finally(() => setIsLoading(false))
+    const checkToken = async () => {
+      try {
+        const token = await AsyncStorage.getItem('jwt_token')
+        setIsLoggedIn(!!token)
+      } catch (e) {
+        setIsLoggedIn(false)
+      } finally {
+        setIsLoading(false)  // ← hides the orange spinner in App.jsx
+      }
+    }
+    checkToken()
   }, [])
 
-  const login = async () => {
-    await AsyncStorage.setItem('isLoggedIn', 'true')
-    setIsLoggedIn(true)
+  const login = () => {
+    setIsLoggedIn(true)   // flip flag → App.jsx swaps to Dashboard automatically
   }
 
   const logout = async () => {
-    await AsyncStorage.removeItem('isLoggedIn')
-    setIsLoggedIn(false)
+    try {
+      await AsyncStorage.removeItem('jwt_token')
+      await AsyncStorage.removeItem('user')
+    } catch (e) {
+      console.log('Logout error:', e)
+    }
+    setIsLoggedIn(false)  // flip flag → App.jsx swaps to Login automatically
   }
 
   return (
