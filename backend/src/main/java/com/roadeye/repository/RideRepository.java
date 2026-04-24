@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface RideRepository extends JpaRepository<Ride, Long> {
+public interface RideRepository extends JpaRepository<Ride, UUID> {
     List<Ride> findByUserId(UUID userId);
 
     List<Ride> findByUserIdOrderByStartTimeDesc(UUID userId);

@@ -59,7 +59,7 @@ public class EmergencyContactService {
     /**
      * Update an emergency contact
      */
-    public EmergencyContact updateEmergencyContact(Long contactId, EmergencyContact contactData) {
+    public EmergencyContact updateEmergencyContact(UUID contactId, EmergencyContact contactData) {
         EmergencyContact contact = emergencyContactRepository.findById(contactId)
                 .orElseThrow(() -> new RuntimeException("Contact not found"));
 
@@ -82,14 +82,14 @@ public class EmergencyContactService {
     /**
      * Delete an emergency contact
      */
-    public void deleteEmergencyContact(Long contactId) {
+    public void deleteEmergencyContact(UUID contactId) {
         emergencyContactRepository.deleteById(contactId);
     }
 
     /**
      * Toggle emergency contact enabled status
      */
-    public EmergencyContact toggleContact(Long contactId) {
+    public EmergencyContact toggleContact(UUID contactId) {
         EmergencyContact contact = emergencyContactRepository.findById(contactId)
                 .orElseThrow(() -> new RuntimeException("Contact not found"));
 

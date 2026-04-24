@@ -18,11 +18,12 @@ public class AppConfiguration {
 
     /**
      * Password encoder bean using BCrypt.
-     */
+    
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
+    */
 
     /**
      * CORS configuration.

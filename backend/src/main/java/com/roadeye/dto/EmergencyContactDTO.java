@@ -8,7 +8,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 public class EmergencyContactDTO {
-    private Long id;
+    private UUID id;
     private UUID userId;
     private String contactName;
     private String phoneNumber;

@@ -3,6 +3,7 @@ package com.roadeye.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 /**
  * EmergencyContact entity - stores emergency contact information for users
@@ -16,8 +17,8 @@ import java.time.LocalDateTime;
 public class EmergencyContact {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

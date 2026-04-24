@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public interface EmergencyContactRepository extends JpaRepository<EmergencyContact, Long> {
+public interface EmergencyContactRepository extends JpaRepository<EmergencyContact, UUID> {
     List<EmergencyContact> findByUserId(UUID userId);
 
     List<EmergencyContact> findByUserIdAndEnabled(UUID userId, Boolean enabled);
