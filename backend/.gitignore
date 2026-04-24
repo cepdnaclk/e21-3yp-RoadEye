@@ -1,9 +1,13 @@
-# Ignore compiled Java classes
+# =========================
+# Java (if used)
+# =========================
 *.class
 *.jar
 *.war
 
+# =========================
 # Maven
+# =========================
 target/
 .m2/
 pom.xml.tag
@@ -14,57 +18,75 @@ pom.xml.bak
 release.properties
 dependency-reduced-pom.xml
 
-# IDE - IntelliJ IDEA
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+
+# =========================
+# IDEs
+# =========================
 .idea/
 *.iml
 *.iws
 *.ipr
 out/
-
-# IDE - Eclipse
 .classpath
 .project
 .settings/
 .sts4-cache/
-
-# IDE - Visual Studio Code
 .vscode/
 *.code-workspace
 
-# OS
+# =========================
+# OS files
+# =========================
 .DS_Store
 Thumbs.db
 
+# =========================
 # Logs
+# =========================
 *.log
 *.log.*
 
-# Gradle
-.gradle/
-build/
-
-# Local development
+# =========================
+# Environment variables (IMPORTANT)
+# =========================
 .env
+.env.*
+
+# =========================
+# Local config
+# =========================
 local.properties
 *.properties.local
 
+# =========================
 # Database
+# =========================
 pgdata/
 *.db
 *.sqlite
 
+# =========================
 # Node (frontend tools)
+# =========================
 node_modules/
 package-lock.json
 yarn.lock
 
+# =========================
 # Misc
+# =========================
 *.swp
 *.swo
 *~
 .c9/
 *.sublime-workspace
-*.sublime-workspace
 
+# =========================
 # Expo
+# =========================
 .expo/
