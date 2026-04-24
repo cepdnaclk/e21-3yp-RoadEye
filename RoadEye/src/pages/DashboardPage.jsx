@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Animated } from 'react-native'
+import { useState, useCallback } from 'react'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
@@ -15,16 +15,17 @@ import BottomNav       from '../components/dashboard/BottomNav'
 
 const C = colors
 
+// ── Static fallback stats (shown before helmet connects) ──────────────────────
+const DEFAULT_WEEK_STATS = [
+  { icon: '🚴', label: 'Stability score',      val: 68,  helmetKey: 'stability' },
+  { icon: '🛑', label: 'Aggressive Brakings',  val: 35,  helmetKey: 'brakingCount' },
+  { icon: '🏍️', label: 'Sudden Accelerations', val: 56,  helmetKey: 'accelCount' },
+  { icon: '↪️', label: 'Sharp turns',           val: 10,  helmetKey: 'sharpTurnCount' },
+]
+
 const highlights = [
   { label: 'Duration',      value: '11,857',  sub: 'updated 15 min ago', colors: ['#5B47E0','#7B5CF5'], icon: '⏱' },
   { label: 'Average Speed', value: '40 km/h', sub: 'updated 5s ago',     colors: ['#7B5CF5','#A78BFA'], icon: '🚴' },
-]
-
-const weekStats = [
-  { icon: '🚴', label: 'Stability score',      val: 68 },
-  { icon: '🛑', label: 'Aggressive Brakings',  val: 35 },
-  { icon: '🏍️', label: 'Sudden Accelerations', val: 56 },
-  { icon: '↪️', label: 'Sharp turns',           val: 10 },
 ]
 
 export default function DashboardPage() {
@@ -33,12 +34,42 @@ export default function DashboardPage() {
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
+  // ── Live helmet data state ────────────────────────────────────────────────
+  const [helmetData, setHelmetData]             = useState(null)
+  const [helmetConnected, setHelmetConnected]   = useState(false)
+
+  // Called by DashboardHeader → HelmetConnectButton whenever new data arrives
+  const handleHelmetData = useCallback((data) => {
+    if (data) setHelmetData(data)
+  }, [])
+
+  // Called by DashboardHeader → HelmetConnectButton on state changes
+  const handleConnectionChange = useCallback((state) => {
+    setHelmetConnected(state === 'connected')
+  }, [])
+
+  // ── Merge live helmet data into weekStats ─────────────────────────────────
+  // If helmet is connected and has a value for a stat's helmetKey, use it.
+  // Otherwise fall back to the static default value.
+  const weekStats = DEFAULT_WEEK_STATS.map(stat => ({
+    ...stat,
+    val: (helmetConnected && helmetData?.[stat.helmetKey] !== undefined)
+      ? helmetData[stat.helmetKey]
+      : stat.val,
+    live: helmetConnected && helmetData?.[stat.helmetKey] !== undefined,
+  }))
+
   // Live session state
   const navSession = useNavSession()
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <DashboardHeader onLogout={logout} />
+      {/* DashboardHeader now owns the helmet connect button and bubbles data up */}
+      <DashboardHeader
+        onLogout={logout}
+        onHelmetData={handleHelmetData}
+        onConnectionChange={handleConnectionChange}
+      />
 
       {/* ── Live navigation banner ── */}
       {navSession.active && (
@@ -82,13 +113,18 @@ export default function DashboardPage() {
           ))}
         </View>
 
+        {/* ── This week report — updates live when helmet is connected ── */}
         <SectionHeader title="This week report" />
         <View style={styles.grid}>
           {weekStats.map(s => (
-            <View key={s.label} style={styles.statCard}>
-              <Text style={{ fontSize: 16 }}>{s.icon}</Text>
+            <View key={s.label} style={[styles.statCard, s.live && styles.statCardLive]}>
+              <View style={styles.statCardTop}>
+                <Text style={{ fontSize: 16 }}>{s.icon}</Text>
+                {/* Green pulse dot when this value is live from helmet */}
+                {s.live && <View style={styles.liveDot} />}
+              </View>
               <Text style={styles.statLabel}>{s.label}</Text>
-              <Text style={styles.statVal}>{s.val}</Text>
+              <Text style={[styles.statVal, s.live && styles.statValLive]}>{s.val}</Text>
             </View>
           ))}
         </View>
@@ -192,9 +228,20 @@ const styles = StyleSheet.create({
   highlightIcon:     { fontSize: 20 },
   highlightVal:      { fontSize: 22, fontWeight: '800', color: '#fff', marginVertical: 6 },
   highlightSub:      { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
-  statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
+
+  // Stat cards
+  statCard:          {
+    flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14,
+    padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06, shadowRadius: 4, elevation: 1,
+  },
+  // Subtle green border when showing live data
+  statCardLive:      { borderWidth: 1.5, borderColor: '#4ade80' },
+  statCardTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
   statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
+  statValLive:       { color: '#16a34a' },   // green when live
+  liveDot:           { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
 
   // Nav button
   navBtn: {

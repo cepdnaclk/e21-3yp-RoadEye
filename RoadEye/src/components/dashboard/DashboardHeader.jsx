@@ -3,10 +3,13 @@ import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'reac
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../../hooks/useAuth'
 import { colors } from '../../utils/theme'
+import HelmetConnectButton from './HelmetConnectButton'
 
 const C = colors
 
-export default function DashboardHeader({ onLogout }) {
+// DashboardHeader now accepts onHelmetData and onConnectionChange
+// so DashboardPage can react to live helmet data.
+export default function DashboardHeader({ onLogout, onHelmetData, onConnectionChange }) {
   const { user }   = useAuth()
   const navigation = useNavigation()
   const [dropdown, setDropdown] = useState(false)
@@ -52,13 +55,11 @@ export default function DashboardHeader({ onLogout }) {
         </View>
       </View>
 
-      <View style={styles.pills}>
-        <View style={styles.connectedPill}>
-          <View style={styles.greenDot} />
-          <Text style={styles.connectedText}>Connected to the helmet</Text>
-        </View>
-        
-      </View>
+      {/* ── Real helmet connect button replaces the static pill ── */}
+      <HelmetConnectButton
+        onDataReceived={onHelmetData}
+        onConnectionChange={onConnectionChange}
+      />
 
       {/* Dropdown Modal */}
       <Modal
@@ -124,12 +125,6 @@ const styles = StyleSheet.create({
   iconText:       { fontSize: 18 },
   avatar:         { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { color: '#fff', fontWeight: '800', fontSize: 14 },
-  pills:          { flexDirection: 'row', gap: 10 },
-  connectedPill:  { backgroundColor: C.primary, borderRadius: 40, paddingHorizontal:110, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  greenDot:       { width: 8, height: 8, borderRadius: 4, backgroundColor: '#4ade80' },
-  connectedText:  { color: '#fff', fontSize: 12, fontWeight: '700' },
-  //navPill:        { backgroundColor: C.purpleSoft, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, borderWidth: 1, borderColor: '#DDD6FE' },
-  //navText:        { color: C.primary, fontSize: 12, fontWeight: '700' },
 
   // Modal
   backdrop:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
