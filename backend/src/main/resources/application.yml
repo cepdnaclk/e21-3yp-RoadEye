@@ -3,6 +3,7 @@
 # Server Configuration
 server:
   port: 8080
+  address: 0.0.0.0
   servlet:
     context-path: /
   compression:
@@ -13,23 +14,9 @@ spring:
   application:
     name: RoadEye Backend
 
-  # JPA/Hibernate Configuration
-  jpa:
-    hibernate:
-      ddl-auto: none # Use existing schema without validation
-    properties:
-      hibernate:
-        format_sql: true
-        use_sql_comments: true
-        jdbc:
-          batch_size: 20
-        order_inserts: true
-        order_updates: true
-    show-sql: false
-
   # PostgreSQL Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5433/roadeye_db
+    url: jdbc:postgresql://localhost:5433/roadeye_db      # ← 5432 is the default PostgreSQL port
     username: roadeye_user
     password: roadeye_password
     driver-class-name: org.postgresql.Driver
@@ -38,11 +25,24 @@ spring:
       minimum-idle: 5
       connection-timeout: 20000
 
-  # Flyway Configuration for database migrations
+  # JPA/Hibernate Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect   # ← explicitly set dialect
+    hibernate:
+      ddl-auto: update    # ← 'update' is safer than 'none' during development
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        jdbc:
+          batch_size: 20
+        order_inserts: true
+        order_updates: true
+    show-sql: true          # ← true during dev so you can see queries
+
+  # Flyway — disabled for now (enable when DB is stable)
   flyway:
     enabled: false
-    locations: classpath:db/migration
-    baseline-on-migrate: true
 
 # Logging Configuration
 logging:
@@ -52,7 +52,6 @@ logging:
     org.springframework.web: INFO
     org.springframework.security: DEBUG
     org.hibernate.SQL: DEBUG
-    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 

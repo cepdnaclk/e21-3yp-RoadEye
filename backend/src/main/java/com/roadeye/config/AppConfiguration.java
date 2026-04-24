@@ -7,17 +7,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
-import java.util.List;
 
 /**
- * Configuration for password encoding, CORS, and other beans
+ * Configuration for password encoding, CORS, and other beans.
  */
 @Configuration
 public class AppConfiguration {
 
     /**
-     * Password encoder bean using BCrypt
+     * Password encoder bean using BCrypt.
      */
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -25,18 +25,23 @@ public class AppConfiguration {
     }
 
     /**
-     * Configure CORS to allow requests from the mobile app and frontend
+     * CORS configuration.
+     *
+     * Using setAllowedOriginPatterns("*") instead of setAllowedOrigins(...)
+     * because the wildcard pattern works correctly with allowCredentials=true
+     * and also covers any physical device IP without hardcoding.
      */
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:3000",    // React frontend
-                "http://localhost:8080",    // Another local endpoint
-                "http://127.0.0.1:*", // Allow any port on localhost
-                "http://10.30.1.169:8080"       
+
+        // Allow any origin — covers Android emulator, iOS simulator,
+        // and any physical device on your LAN without hardcoding IPs.
+        configuration.setAllowedOriginPatterns(Arrays.asList("*"));
+
+        configuration.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
