@@ -14,21 +14,31 @@ let _state = {
   etaMin:      null,
   currentStep: null,   // { arrow, text, dist }
   speed:       0,
+  helmetView:  false,  // true when map is in helmet black/white mode
 }
 let _listeners    = new Set()
-let _destWeatherCb = null   // WeatherCard registers here
+let _destWeatherCb = null
 
 const notify = () => _listeners.forEach(fn => fn({ ..._state }))
 
 // ── WeatherCard destination bridge ───────────────────────────────────────────
-// WeatherCard calls this to register itself on mount
-export const registerDestWeatherListener = (cb) => { _destWeatherCb = cb }
-export const unregisterDestWeatherListener = ()  => { _destWeatherCb = null }
+export const registerDestWeatherListener   = (cb) => { _destWeatherCb = cb }
+export const unregisterDestWeatherListener = ()    => { _destWeatherCb = null }
 
-// Called by NavigationScreen when route starts / clears
 export const setDestinationWeatherTarget = (target) => {
   if (_destWeatherCb) _destWeatherCb(target)
 }
+
+// ── Helmet view state ─────────────────────────────────────────────────────────
+// Called by NavigationScreen when the map switches to/from helmet display mode.
+// Other screens can read this via useNavSession() → state.helmetView
+// or synchronously via getNavState().helmetView
+export const setHelmetView = (active) => {
+  _state = { ..._state, helmetView: active }
+  notify()
+}
+
+export const isHelmetViewActive = () => _state.helmetView
 
 // ── Public API ────────────────────────────────────────────────────────────────
 export const startNavSession = async ({ destination, distKm, etaMin }) => {
@@ -50,9 +60,16 @@ export const updateNavSpeed = (speed) => {
 }
 
 export const stopNavSession = async () => {
-  _state = { active: false, destination: null, distKm: null, etaMin: null, currentStep: null, speed: 0 }
+  _state = {
+    active:      false,
+    destination: null,
+    distKm:      null,
+    etaMin:      null,
+    currentStep: null,
+    speed:       0,
+    helmetView:  false,  // reset helmet view on session stop
+  }
   notify()
-  // Also clear destination weather in WeatherCard
   setDestinationWeatherTarget(null)
   await Notifications.dismissAllNotificationsAsync()
   try { await Location.stopLocationUpdatesAsync(NAV_TASK) } catch (_) {}
@@ -65,7 +82,7 @@ export const useNavSession = () => {
   const [state, setState] = useState({ ..._state })
   useEffect(() => {
     _listeners.add(setState)
-    setState({ ..._state })   // sync immediately on mount
+    setState({ ..._state })
     return () => _listeners.delete(setState)
   }, [])
   return state

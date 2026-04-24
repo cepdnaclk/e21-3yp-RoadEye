@@ -13,6 +13,7 @@ import {
   updateNavSpeed,
   getNavState,
   setDestinationWeatherTarget,
+  setHelmetView,
 } from '../utils/NavigationSession'
 
 export default function NavigationScreen({ navigation }) {
@@ -20,7 +21,7 @@ export default function NavigationScreen({ navigation }) {
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
   const sessionActive = useRef(false)
-  const webViewReady  = useRef(false)   // guard so we don't inject before load
+  const webViewReady  = useRef(false)
 
   const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
 
@@ -38,6 +39,19 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(script)
   }, [])
 
+  // ── Helmet view helpers ───────────────────────────────────────────────────
+  // Call these whenever your Bluetooth/WiFi helmet cast starts or stops.
+  // They tell the WebView map to switch tile layer + colors.
+  const enableHelmetView = useCallback(() => {
+    injectMessage({ type: 'helmetView', active: true })
+    setHelmetView(true)
+  }, [injectMessage])
+
+  const disableHelmetView = useCallback(() => {
+    injectMessage({ type: 'helmetView', active: false })
+    setHelmetView(false)
+  }, [injectMessage])
+
   // ── GPS ───────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
@@ -48,7 +62,7 @@ export default function NavigationScreen({ navigation }) {
       return
     }
     setGpsStatus('GPS acquiring…')
-    locationSub.current?.remove()   // clear any stale sub
+    locationSub.current?.remove()
     locationSub.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
       (loc) => {
@@ -68,14 +82,12 @@ export default function NavigationScreen({ navigation }) {
     if (existing.active && existing.destination) {
       sessionActive.current = true
 
-      // Restore weather card immediately
       setDestinationWeatherTarget({
         lat:  existing.destination.lat,
         lng:  existing.destination.lng,
         name: existing.destination.name,
       })
 
-      // Small delay so the map JS finishes attaching its message listener
       setTimeout(() => {
         injectMessage({
           type:        'restoreRoute',
@@ -85,10 +97,15 @@ export default function NavigationScreen({ navigation }) {
           distKm:      existing.distKm,
           etaMin:      existing.etaMin,
         })
+
+        // If helmet view was active when user left this screen, restore it
+        if (existing.helmetView) {
+          setTimeout(() => enableHelmetView(), 800)
+        }
       }, 500)
     }
     startGPS()
-  }, [startGPS, injectMessage])
+  }, [startGPS, injectMessage, enableHelmetView])
 
   // ── WebView messages ──────────────────────────────────────────────────────
   const onWebViewMessage = useCallback(async (event) => {
@@ -115,11 +132,32 @@ export default function NavigationScreen({ navigation }) {
 
       if (msg.type === 'clear' || msg.type === 'arrived') {
         sessionActive.current = false
-        await stopNavSession()   // this also clears WeatherCard via NavigationSession
+        await stopNavSession()
+      }
+
+      // helmetConnected / helmetDisconnected messages from your Bluetooth/WiFi layer
+      // These are sent by your native helmet module into the WebView, which then
+      // re-posts helmetViewToggled back — but you can also intercept here.
+      if (msg.type === 'helmetViewToggled') {
+        setHelmetView(msg.active)
       }
 
     } catch (_) {}
   }, [])
+
+  // ── Helper: send helmet connect/disconnect to map (call from your BT layer) ─
+  // Export these so your HelmetBridge or BT manager can call them:
+  //   navigationScreenRef.current?.sendHelmetConnected()
+  //   navigationScreenRef.current?.sendHelmetDisconnected()
+  const sendHelmetConnected = useCallback(() => {
+    injectMessage({ type: 'helmetConnected' })
+    enableHelmetView()
+  }, [injectMessage, enableHelmetView])
+
+  const sendHelmetDisconnected = useCallback(() => {
+    injectMessage({ type: 'helmetDisconnected' })
+    disableHelmetView()
+  }, [injectMessage, disableHelmetView])
 
   // ── App background/foreground ─────────────────────────────────────────────
   useEffect(() => {
@@ -144,11 +182,10 @@ export default function NavigationScreen({ navigation }) {
   useEffect(() => {
     const existing = getNavState()
     if (existing.active) sessionActive.current = true
-    // GPS starts in onWebViewLoad — not here — so WebView is ready first
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // Do NOT stop session — must survive screen unmount
+      // Session intentionally NOT stopped on unmount — must survive screen changes
     }
   }, [])
 
@@ -163,7 +200,7 @@ export default function NavigationScreen({ navigation }) {
           {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
-              await stopNavSession()   // clears WeatherCard too
+              await stopNavSession()
               sessionActive.current = false
               navigation.goBack()
             },
