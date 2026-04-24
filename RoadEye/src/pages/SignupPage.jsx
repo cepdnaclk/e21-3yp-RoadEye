@@ -6,30 +6,75 @@ import {
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 
-export default function SignupPage() {
-  const { login }    = useAuth()
-  const navigation   = useNavigation()
+// ── Change this to match your environment ──────────────────────────────────
+// Android emulator  → 'http://10.0.2.2:8080'
+// iOS simulator     → 'http://localhost:8080'
+// Physical device   → 'http://192.168.x.x:8080'  (your PC's LAN IP)
+const BASE_URL = 'http://10.30.1.169:8081'
+// ───────────────────────────────────────────────────────────────────────────
 
-  const [username, setUsername] = useState('')
-  const [email,    setEmail]    = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm,  setConfirm]  = useState('')
-  const [showPw1,  setShowPw1]  = useState(false)
-  const [showPw2,  setShowPw2]  = useState(false)
-  const [error,    setError]    = useState('')
-  const [loading,  setLoading]  = useState(false)
-  const [focused,  setFocused]  = useState('')
+export default function SignupPage() {
+  const { login }   = useAuth()
+  const navigation  = useNavigation()
+
+  const [username,  setUsername]  = useState('')
+  const [email,     setEmail]     = useState('')
+  const [password,  setPassword]  = useState('')
+  const [confirm,   setConfirm]   = useState('')
+  const [showPw1,   setShowPw1]   = useState(false)
+  const [showPw2,   setShowPw2]   = useState(false)
+  const [error,     setError]     = useState('')
+  const [loading,   setLoading]   = useState(false)
+  const [focused,   setFocused]   = useState('')
 
   const handleSignup = async () => {
+    // ── Validation ──────────────────────────────────────────────────────────
     if (!username || !email || !password || !confirm) {
-      setError('Please fill in all fields'); return
+      setError('Please fill in all fields')
+      return
     }
     if (password !== confirm) {
-      setError('Passwords do not match'); return
+      setError('Passwords do not match')
+      return
     }
-    setError(''); setLoading(true)
-    await new Promise(r => setTimeout(r, 700))
-    login()
+
+    // ── Call backend ────────────────────────────────────────────────────────
+    try {
+      setLoading(true)
+      setError('')
+
+      const response = await fetch(`${BASE_URL}/api/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email:     email,
+          password:  password,
+          firstName: username,   // username field mapped to firstName
+          lastName:  'User',     // default lastName — add a field if needed
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        // Backend returns { "error": "..." } on failure
+        throw new Error(data.error || 'Signup failed')
+      }
+
+      console.log('User created:', data)
+
+      // ✅ Only login after DB save confirmed
+      login()
+
+    } catch (err) {
+      if (err.message === 'Network request failed') {
+        setError('Cannot reach server. Check your IP / BASE_URL.')
+      } else {
+        setError(err.message)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const field = (name) => [
@@ -51,45 +96,86 @@ export default function SignupPage() {
         </View>
       )}
 
+      {/* Username */}
       <Text style={styles.label}>Username</Text>
-      <TextInput style={field('username')} placeholder="Enter username" placeholderTextColor="#AAAAB8"
-        autoComplete="off" autoCorrect={false}
-        value={username} onChangeText={setUsername}
-        onFocus={() => setFocused('username')} onBlur={() => setFocused('')} />
+      <TextInput
+        style={field('username')}
+        placeholder="Enter username"
+        placeholderTextColor="#AAAAB8"
+        autoComplete="off"
+        autoCorrect={false}
+        value={username}
+        onChangeText={setUsername}
+        onFocus={() => setFocused('username')}
+        onBlur={() => setFocused('')}
+      />
 
+      {/* Email */}
       <Text style={styles.label}>Email</Text>
-      <TextInput style={field('email')} placeholder="Enter email" placeholderTextColor="#AAAAB8"
-        keyboardType="email-address" autoCapitalize="none" autoComplete="off"
-        value={email} onChangeText={setEmail}
-        onFocus={() => setFocused('email')} onBlur={() => setFocused('')} />
+      <TextInput
+        style={field('email')}
+        placeholder="Enter email"
+        placeholderTextColor="#AAAAB8"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoComplete="off"
+        value={email}
+        onChangeText={setEmail}
+        onFocus={() => setFocused('email')}
+        onBlur={() => setFocused('')}
+      />
 
+      {/* Password */}
       <Text style={styles.label}>Password</Text>
       <View style={[styles.inputWrap, focused === 'pw1' && styles.inputFocused]}>
-        <TextInput style={[styles.input, { flex: 1, borderWidth: 0 }]} placeholder="Enter password" placeholderTextColor="#AAAAB8"
-          secureTextEntry={!showPw1} autoComplete="off"
-          value={password} onChangeText={setPassword}
-          onFocus={() => setFocused('pw1')} onBlur={() => setFocused('')} />
+        <TextInput
+          style={[styles.input, { flex: 1, borderWidth: 0 }]}
+          placeholder="Enter password"
+          placeholderTextColor="#AAAAB8"
+          secureTextEntry={!showPw1}
+          autoComplete="off"
+          value={password}
+          onChangeText={setPassword}
+          onFocus={() => setFocused('pw1')}
+          onBlur={() => setFocused('')}
+        />
         <TouchableOpacity onPress={() => setShowPw1(!showPw1)} style={styles.eyeBtn}>
           <Text>{showPw1 ? '🙈' : '👁️'}</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Confirm Password */}
       <Text style={styles.label}>Re-enter Password</Text>
       <View style={[styles.inputWrap, focused === 'pw2' && styles.inputFocused]}>
-        <TextInput style={[styles.input, { flex: 1, borderWidth: 0 }]} placeholder="Enter password" placeholderTextColor="#AAAAB8"
-          secureTextEntry={!showPw2} autoComplete="off"
-          value={confirm} onChangeText={setConfirm}
-          onFocus={() => setFocused('pw2')} onBlur={() => setFocused('')} />
+        <TextInput
+          style={[styles.input, { flex: 1, borderWidth: 0 }]}
+          placeholder="Enter password"
+          placeholderTextColor="#AAAAB8"
+          secureTextEntry={!showPw2}
+          autoComplete="off"
+          value={confirm}
+          onChangeText={setConfirm}
+          onFocus={() => setFocused('pw2')}
+          onBlur={() => setFocused('')}
+        />
         <TouchableOpacity onPress={() => setShowPw2(!showPw2)} style={styles.eyeBtn}>
           <Text>{showPw2 ? '🙈' : '👁️'}</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity onPress={handleSignup} disabled={loading} style={[styles.btn, loading && styles.btnDisabled]}>
+      {/* Submit */}
+      <TouchableOpacity
+        onPress={handleSignup}
+        disabled={loading}
+        style={[styles.btn, loading && styles.btnDisabled]}
+      >
         {loading && <ActivityIndicator color="#fff" style={{ marginRight: 10 }} />}
-        <Text style={styles.btnText}>{loading ? 'Creating account...' : 'Create Account'}</Text>
+        <Text style={styles.btnText}>
+          {loading ? 'Creating account...' : 'Create Account'}
+        </Text>
       </TouchableOpacity>
 
+      {/* Navigate to login */}
       <View style={styles.loginRow}>
         <Text style={styles.loginText}>Already have an account? </Text>
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
