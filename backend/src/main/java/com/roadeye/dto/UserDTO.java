@@ -1,13 +1,14 @@
 package com.roadeye.dto;
 
 import lombok.*;
+import java.util.UUID;
 
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class UserDTO {
-    private Long id;
+    private UUID id;
     private String email;
     private String firstName;
     private String lastName;

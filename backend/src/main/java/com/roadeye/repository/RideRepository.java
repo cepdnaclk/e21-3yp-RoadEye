@@ -6,14 +6,16 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 @Repository
 public interface RideRepository extends JpaRepository<Ride, Long> {
-    List<Ride> findByUserId(Long userId);
-    List<Ride> findByUserIdOrderByStartTimeDesc(Long userId);
+    List<Ride> findByUserId(UUID userId);
+
+    List<Ride> findByUserIdOrderByStartTimeDesc(UUID userId);
+
     List<Ride> findByUserIdAndStartTimeBetween(
-            Long userId,
+            UUID userId,
             LocalDateTime startTime,
-            LocalDateTime endTime
-    );
+            LocalDateTime endTime);
 }

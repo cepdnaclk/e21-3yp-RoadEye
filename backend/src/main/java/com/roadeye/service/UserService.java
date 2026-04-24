@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -45,20 +46,23 @@ public class UserService {
     /**
      * Find user by ID
      */
-    public Optional<User> findById(Long userId) {
+    public Optional<User> findById(UUID userId) {
         return userRepository.findById(userId);
     }
 
     /**
      * Update user profile
      */
-    public User updateProfile(Long userId, String firstName, String lastName, String phoneNumber) {
+    public User updateProfile(UUID userId, String firstName, String lastName, String phoneNumber) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (firstName != null) user.setFirstName(firstName);
-        if (lastName != null) user.setLastName(lastName);
-        if (phoneNumber != null) user.setPhoneNumber(phoneNumber);
+        if (firstName != null)
+            user.setFirstName(firstName);
+        if (lastName != null)
+            user.setLastName(lastName);
+        if (phoneNumber != null)
+            user.setPhoneNumber(phoneNumber);
 
         return userRepository.save(user);
     }
@@ -73,7 +77,7 @@ public class UserService {
     /**
      * Deactivate user account
      */
-    public void deactivateUser(Long userId) {
+    public void deactivateUser(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setActive(false);

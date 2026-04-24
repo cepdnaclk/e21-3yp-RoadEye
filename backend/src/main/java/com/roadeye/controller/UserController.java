@@ -6,29 +6,30 @@ import com.roadeye.security.JwtService; // NEW (JWT)
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder; 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
-//@RequiredArgsConstructor
+// @RequiredArgsConstructor
 public class UserController {
 
     private final UserService userService;
 
-    //Inject password encoder
+    // Inject password encoder
     private final PasswordEncoder passwordEncoder;
 
-    //Inject JWT utility
+    // Inject JWT utility
     private final JwtService jwtService;
 
-    //MANUAL CONSTRUCTOR (FIX)
+    // MANUAL CONSTRUCTOR (FIX)
     public UserController(UserService userService,
-                          PasswordEncoder passwordEncoder,
-                          JwtService jwtService) {
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -44,8 +45,7 @@ public class UserController {
                     request.getEmail(),
                     request.getPassword(),
                     request.getFirstName(),
-                    request.getLastName()
-            );
+                    request.getLastName());
             return ResponseEntity.status(HttpStatus.CREATED).body(toDTO(user));
         } catch (IllegalArgumentException e) {
             Map<String, String> error = new HashMap<>();
@@ -76,8 +76,7 @@ public class UserController {
             // 4. Return token
             return ResponseEntity.ok(Map.of(
                     "token", token,
-                    "user", toDTO(user)
-            ));
+                    "user", toDTO(user)));
 
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -89,7 +88,7 @@ public class UserController {
      * GET USER PROFILE
      */
     @GetMapping("/{userId}")
-    public ResponseEntity<?> getUserProfile(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserProfile(@PathVariable UUID userId) {
         return userService.findById(userId)
                 .map(user -> ResponseEntity.ok(toDTO(user)))
                 .orElse(ResponseEntity.notFound().build());
@@ -100,15 +99,14 @@ public class UserController {
      */
     @PutMapping("/{userId}")
     public ResponseEntity<?> updateProfile(
-            @PathVariable Long userId,
+            @PathVariable UUID userId,
             @RequestBody UpdateProfileRequest request) {
         try {
             User user = userService.updateProfile(
                     userId,
                     request.getFirstName(),
                     request.getLastName(),
-                    request.getPhoneNumber()
-            );
+                    request.getPhoneNumber());
             return ResponseEntity.ok(toDTO(user));
         } catch (RuntimeException e) {
             return ResponseEntity.notFound().build();
@@ -119,7 +117,7 @@ public class UserController {
      * DELETE (DEACTIVATE) USER
      */
     @DeleteMapping("/{userId}")
-    public ResponseEntity<?> deactivateUser(@PathVariable Long userId) {
+    public ResponseEntity<?> deactivateUser(@PathVariable UUID userId) {
         try {
             userService.deactivateUser(userId);
             return ResponseEntity.ok(Map.of("message", "User deactivated successfully"));
@@ -185,7 +183,7 @@ public class UserController {
     @lombok.Data
     @lombok.Builder
     public static class UserDTO {
-        private Long id;
+        private UUID id;
         private String email;
         private String firstName;
         private String lastName;

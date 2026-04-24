@@ -1,6 +1,7 @@
 package com.roadeye.dto;
 
 import lombok.*;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -8,7 +9,7 @@ import lombok.*;
 @AllArgsConstructor
 public class CrashEventDTO {
     private Long id;
-    private Long userId;
+    private UUID userId;
     private Long rideId;
     private String occurredAt;
     private Double latitude;

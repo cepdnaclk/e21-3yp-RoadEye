@@ -1,6 +1,7 @@
 package com.roadeye.dto;
 
 import lombok.*;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -8,7 +9,7 @@ import lombok.*;
 @AllArgsConstructor
 public class RideDTO {
     private Long id;
-    private Long userId;
+    private UUID userId;
     private String startTime;
     private String endTime;
     private Double startLatitude;

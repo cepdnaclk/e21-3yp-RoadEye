@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -22,7 +23,7 @@ public class EmergencyContactController {
      */
     @PostMapping
     public ResponseEntity<?> addEmergencyContact(
-            @RequestParam Long userId,
+            @RequestParam UUID userId,
             @RequestBody AddEmergencyContactRequest request) {
         try {
             EmergencyContact contact = EmergencyContact.builder()
@@ -46,7 +47,7 @@ public class EmergencyContactController {
      * GET /api/emergency-contacts/user/{userId} - Get all emergency contacts
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserEmergencyContacts(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserEmergencyContacts(@PathVariable UUID userId) {
         List<EmergencyContact> contacts = emergencyContactService.getUserEmergencyContacts(userId);
         List<EmergencyContactDTO> contactDTOs = contacts.stream().map(this::toDTO).collect(Collectors.toList());
         return ResponseEntity.ok(contactDTOs);
@@ -56,7 +57,7 @@ public class EmergencyContactController {
      * GET /api/emergency-contacts/user/{userId}/enabled - Get enabled contacts only
      */
     @GetMapping("/user/{userId}/enabled")
-    public ResponseEntity<?> getEnabledEmergencyContacts(@PathVariable Long userId) {
+    public ResponseEntity<?> getEnabledEmergencyContacts(@PathVariable UUID userId) {
         List<EmergencyContact> contacts = emergencyContactService.getEnabledEmergencyContacts(userId);
         List<EmergencyContactDTO> contactDTOs = contacts.stream().map(this::toDTO).collect(Collectors.toList());
         return ResponseEntity.ok(contactDTOs);
@@ -75,8 +76,9 @@ public class EmergencyContactController {
                     .phone(request.getPhone())
                     .email(request.getEmail())
                     .relationship(request.getRelationship())
-                    .channel(request.getChannel() != null ? 
-                            EmergencyContact.ContactChannel.valueOf(request.getChannel().toUpperCase()) : null)
+                    .channel(request.getChannel() != null
+                            ? EmergencyContact.ContactChannel.valueOf(request.getChannel().toUpperCase())
+                            : null)
                     .enabled(request.getEnabled())
                     .build();
 
@@ -101,7 +103,8 @@ public class EmergencyContactController {
     }
 
     /**
-     * PATCH /api/emergency-contacts/{contactId}/toggle - Toggle contact enabled status
+     * PATCH /api/emergency-contacts/{contactId}/toggle - Toggle contact enabled
+     * status
      */
     @PatchMapping("/{contactId}/toggle")
     public ResponseEntity<?> toggleContact(@PathVariable Long contactId) {
@@ -153,18 +156,19 @@ public class EmergencyContactController {
     }
 
     /*
-    @lombok.Data
-    @lombok.Builder
-    public static class EmergencyContactDTO {
-        private Long id;
-        private Long userId;
-        private String name;
-        private String phone;
-        private String email;
-        private String relationship;
-        private String channel;
-        private Boolean enabled;
-    }
-}
- */
+     * @lombok.Data
+     * 
+     * @lombok.Builder
+     * public static class EmergencyContactDTO {
+     * private Long id;
+     * private Long userId;
+     * private String name;
+     * private String phone;
+     * private String email;
+     * private String relationship;
+     * private String channel;
+     * private Boolean enabled;
+     * }
+     * }
+     */
 }

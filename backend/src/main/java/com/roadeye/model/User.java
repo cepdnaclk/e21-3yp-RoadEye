@@ -19,7 +19,8 @@ public class User {
 
     @Id
     @GeneratedValue
-    private java.util.UUID id;
+    @Column(columnDefinition = "UUID")
+    private UUID id;
 
     @Column(unique = true, nullable = false)
     private String email;

@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -23,11 +24,12 @@ public class CrashEventService {
     /**
      * Report a crash event
      */
-    public CrashEvent reportCrashEvent(Long userId, CrashEvent crashData) {
+    public CrashEvent reportCrashEvent(UUID userId, CrashEvent crashData) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (crashData.getLatitude() == null || crashData.getLongitude() == null || crashData.getSeverityScore() == null) {
+        if (crashData.getLatitude() == null || crashData.getLongitude() == null
+                || crashData.getSeverityScore() == null) {
             throw new IllegalArgumentException("Missing required crash fields (latitude, longitude, severityScore)");
         }
 
@@ -54,7 +56,7 @@ public class CrashEventService {
     /**
      * Get all crash events for a user
      */
-    public List<CrashEvent> getUserCrashEvents(Long userId) {
+    public List<CrashEvent> getUserCrashEvents(UUID userId) {
         return crashEventRepository.findByUserIdOrderByOccurredAtDesc(userId);
     }
 
@@ -70,7 +72,7 @@ public class CrashEventService {
      * Notify emergency contacts about the crash
      */
     @Transactional
-    public void notifyEmergencyContacts(Long userId, CrashEvent crash) {
+    public void notifyEmergencyContacts(UUID userId, CrashEvent crash) {
         List<EmergencyContact> contacts = emergencyContactRepository.findByUserIdAndEnabled(userId, true);
 
         for (EmergencyContact contact : contacts) {
@@ -87,7 +89,7 @@ public class CrashEventService {
     /**
      * Get crash statistics for a user
      */
-    public CrashStatistics getUserCrashStatistics(Long userId) {
+    public CrashStatistics getUserCrashStatistics(UUID userId) {
         List<CrashEvent> crashes = crashEventRepository.findByUserId(userId);
 
         long severeCount = crashes.stream()

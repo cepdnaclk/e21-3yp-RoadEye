@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
@@ -22,7 +23,7 @@ public class CrashEventController {
      */
     @PostMapping
     public ResponseEntity<?> reportCrashEvent(
-            @RequestParam Long userId,
+            @RequestParam UUID userId,
             @RequestBody ReportCrashRequest request) {
         try {
             CrashEvent crash = CrashEvent.builder()
@@ -46,7 +47,7 @@ public class CrashEventController {
      * GET /api/crashes/user/{userId} - Get all crashes for a user
      */
     @GetMapping("/user/{userId}")
-    public ResponseEntity<?> getUserCrashEvents(@PathVariable Long userId) {
+    public ResponseEntity<?> getUserCrashEvents(@PathVariable UUID userId) {
         List<CrashEvent> crashes = crashEventService.getUserCrashEvents(userId);
         List<CrashEventDTO> crashDTOs = crashes.stream().map(this::toDTO).collect(Collectors.toList());
         return ResponseEntity.ok(crashDTOs);
@@ -71,7 +72,7 @@ public class CrashEventController {
     @PostMapping("/{crashId}/notify")
     public ResponseEntity<?> notifyEmergencyContacts(
             @PathVariable Long crashId,
-            @RequestParam Long userId) {
+            @RequestParam UUID userId) {
         try {
             CrashEvent crash = crashEventService.getCrashEventById(crashId);
             crashEventService.notifyEmergencyContacts(userId, crash);
@@ -85,7 +86,7 @@ public class CrashEventController {
      * GET /api/crashes/stats/{userId} - Get crash statistics
      */
     @GetMapping("/stats/{userId}")
-    public ResponseEntity<?> getCrashStatistics(@PathVariable Long userId) {
+    public ResponseEntity<?> getCrashStatistics(@PathVariable UUID userId) {
         CrashEventService.CrashStatistics stats = crashEventService.getUserCrashStatistics(userId);
         return ResponseEntity.ok(stats);
     }
@@ -121,7 +122,7 @@ public class CrashEventController {
     @lombok.Builder
     public static class CrashEventDTO {
         private Long id;
-        private Long userId;
+        private UUID userId;
         private Long rideId;
         private String occurredAt;
         private Double latitude;

@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/rides")
@@ -23,7 +24,7 @@ public class RideController {
 
     @PostMapping("/start")
     public ResponseEntity<?> startRide(
-            @RequestParam Long userId,
+            @RequestParam UUID userId,
             @RequestBody StartRideRequest request) {
         try {
             Ride ride = rideService.startRide(userId, request.getLatitude(), request.getLongitude());
@@ -38,7 +39,7 @@ public class RideController {
             @PathVariable Long rideId,
             @RequestBody EndRideRequest request) {
         try {
-            Ride ride = rideService.endRide(rideId, request.getEndLatitude(), 
+            Ride ride = rideService.endRide(rideId, request.getEndLatitude(),
                     request.getEndLongitude(), request.getDistanceKm(),
                     request.getAvgSpeedKmh(), request.getMaxSpeedKmh());
             return ResponseEntity.ok(toDTO(ride));
@@ -48,7 +49,7 @@ public class RideController {
     }
 
     @GetMapping("/user/{userId}")
-    public ResponseEntity<List<RideDTO>> getUserRides(@PathVariable Long userId) {
+    public ResponseEntity<List<RideDTO>> getUserRides(@PathVariable UUID userId) {
         return ResponseEntity.ok(rideService.getUserRides(userId));
     }
 
@@ -104,4 +105,3 @@ public class RideController {
         private Double maxSpeedKmh;
     }
 }
-

@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +21,7 @@ public class EmergencyContactService {
     /**
      * Add a new emergency contact
      */
-    public EmergencyContact addEmergencyContact(Long userId, EmergencyContact contactData) {
+    public EmergencyContact addEmergencyContact(UUID userId, EmergencyContact contactData) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
@@ -44,14 +45,14 @@ public class EmergencyContactService {
     /**
      * Get all emergency contacts for a user
      */
-    public List<EmergencyContact> getUserEmergencyContacts(Long userId) {
+    public List<EmergencyContact> getUserEmergencyContacts(UUID userId) {
         return emergencyContactRepository.findByUserId(userId);
     }
 
     /**
      * Get enabled emergency contacts only
      */
-    public List<EmergencyContact> getEnabledEmergencyContacts(Long userId) {
+    public List<EmergencyContact> getEnabledEmergencyContacts(UUID userId) {
         return emergencyContactRepository.findByUserIdAndEnabled(userId, true);
     }
 
@@ -62,12 +63,18 @@ public class EmergencyContactService {
         EmergencyContact contact = emergencyContactRepository.findById(contactId)
                 .orElseThrow(() -> new RuntimeException("Contact not found"));
 
-        if (contactData.getName() != null) contact.setName(contactData.getName());
-        if (contactData.getPhone() != null) contact.setPhone(contactData.getPhone());
-        if (contactData.getEmail() != null) contact.setEmail(contactData.getEmail());
-        if (contactData.getRelationship() != null) contact.setRelationship(contactData.getRelationship());
-        if (contactData.getChannel() != null) contact.setChannel(contactData.getChannel());
-        if (contactData.getEnabled() != null) contact.setEnabled(contactData.getEnabled());
+        if (contactData.getName() != null)
+            contact.setName(contactData.getName());
+        if (contactData.getPhone() != null)
+            contact.setPhone(contactData.getPhone());
+        if (contactData.getEmail() != null)
+            contact.setEmail(contactData.getEmail());
+        if (contactData.getRelationship() != null)
+            contact.setRelationship(contactData.getRelationship());
+        if (contactData.getChannel() != null)
+            contact.setChannel(contactData.getChannel());
+        if (contactData.getEnabled() != null)
+            contact.setEnabled(contactData.getEnabled());
 
         return emergencyContactRepository.save(contact);
     }
