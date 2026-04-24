@@ -34,7 +34,7 @@ public class AppConfiguration {
                 "http://localhost:3000",    // React frontend
                 "http://localhost:8080",    // Another local endpoint
                 "http://127.0.0.1:*", // Allow any port on localhost
-                "http://10.30.1.169:8080"       
+                "http://10.30.1.169:8081"       
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
