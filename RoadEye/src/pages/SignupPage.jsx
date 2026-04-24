@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 // Android emulator  → 'http://10.0.2.2:8080'
 // iOS simulator     → 'http://localhost:8080'
 // Physical device   → 'http://192.168.x.x:8080'  (your PC's LAN IP)
-const BASE_URL = 'http://10.30.1.169:8081'
+const BASE_URL = 'http://10.30.1.169:8080'
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function SignupPage() {
