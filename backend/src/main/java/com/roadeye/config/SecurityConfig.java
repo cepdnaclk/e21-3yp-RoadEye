@@ -36,7 +36,8 @@ public class SecurityConfig {
                 .requestMatchers(
                     "/api/users/register",
                     "/api/users/login",
-                    "/api/auth/**"          // covers any future /api/auth/* routes
+                    "/api/auth/**",
+                    "/api/tilt/event"         // covers any future /api/auth/* routes
                 ).permitAll()
                 // Everything else requires a valid JWT
                 .anyRequest().authenticated()
@@ -46,13 +47,13 @@ public class SecurityConfig {
         return http.build();
     }
 
-    // ✅ Required by UserController — BCrypt password encoder
+    //Required by UserController — BCrypt password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ Required if you use AuthenticationManager anywhere
+    //Required if you use AuthenticationManager anywhere
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
