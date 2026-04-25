@@ -8,7 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.Optional;
 import java.util.UUID;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -72,6 +74,18 @@ public class UserService {
      */
     public boolean verifyPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+
+    /**
+     * Save or update the Expo push token for a user.
+     * Called every time the user opens the app (token can change).
+     */
+    public void saveExpoPushToken(UUID userId, String token) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        user.setExpoPushToken(token);
+        userRepository.save(user);
+        log.info("[Push] Saved push token for user {}", userId);
     }
 
     /**

@@ -16,7 +16,7 @@ spring:
 
   # PostgreSQL Database Configuration
   datasource:
-    url: jdbc:postgresql://localhost:5433/roadeye_db      # ← 5432 is the default PostgreSQL port
+    url: jdbc:postgresql://localhost:5433/roadeye_db # ← 5432 is the default PostgreSQL port
     username: roadeye_user
     password: roadeye_password
     driver-class-name: org.postgresql.Driver
@@ -27,9 +27,9 @@ spring:
 
   # JPA/Hibernate Configuration
   jpa:
-    database-platform: org.hibernate.dialect.PostgreSQLDialect   # ← explicitly set dialect
+    database-platform: org.hibernate.dialect.PostgreSQLDialect # ← explicitly set dialect
     hibernate:
-      ddl-auto: update    # ← 'update' is safer than 'none' during development
+      ddl-auto: update # ← 'update' is safer than 'none' during development
     properties:
       hibernate:
         format_sql: true
@@ -38,11 +38,17 @@ spring:
           batch_size: 20
         order_inserts: true
         order_updates: true
-    show-sql: true          # ← true during dev so you can see queries
+    show-sql: true # ← true during dev so you can see queries
+    open-in-view: false
 
   # Flyway — disabled for now (enable when DB is stable)
   flyway:
     enabled: false
+
+roadeye:
+  tilt:
+    threshold: 21.0
+    cooldown-seconds: 300
 
 # Logging Configuration
 logging:

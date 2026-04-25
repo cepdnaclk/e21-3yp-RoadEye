@@ -114,6 +114,28 @@ public class UserController {
     }
 
     /**
+     * PATCH /api/users/{userId}/push-token
+     * Called by the mobile app on login to register the Expo push token.
+     *
+     * Body: { "expoPushToken": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }
+     */
+    @PatchMapping("/{userId}/push-token")
+    public ResponseEntity<?> savePushToken(
+            @PathVariable UUID userId,
+            @RequestBody Map<String, String> body) {
+        try {
+            String token = body.get("expoPushToken");
+            if (token == null || token.isBlank()) {
+                return ResponseEntity.badRequest().body("expoPushToken is required");
+            }
+            userService.saveExpoPushToken(userId, token);
+            return ResponseEntity.ok(Map.of("message", "Push token saved"));
+        } catch (RuntimeException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
      * DELETE (DEACTIVATE) USER
      */
     @DeleteMapping("/{userId}")

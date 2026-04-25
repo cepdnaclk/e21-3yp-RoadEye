@@ -21,21 +21,23 @@ import java.util.UUID;
 public class TiltEventService {
 
     private final TiltEventRepository tiltEventRepository;
-    private final UserRepository userRepository;
-    private final EmergencyAlertService emergencyAlertService;
-    private final TiltConfig tiltConfig;
+    private final UserRepository      userRepository;
+    private final TiltConfig          tiltConfig;
+    private final ExpoPushService     expoPushService;
 
     public TiltEvent processTiltEvent(UUID userId,
-                                     Double tiltAngle,
-                                     Double latitude,
-                                     Double longitude,
-                                     String customMessage) {
+                                      Double tiltAngle,
+                                      Double latitude,
+                                      Double longitude) {
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
-        double threshold = tiltConfig.getThreshold();
+        double  threshold = tiltConfig.getThreshold();
         boolean triggered = tiltAngle >= threshold;
+
+        log.info("[Tilt] user={} angle={}° threshold={}° triggered={}",
+                userId, tiltAngle, threshold, triggered);
 
         TiltEvent event = TiltEvent.builder()
                 .user(user)
@@ -48,25 +50,54 @@ public class TiltEventService {
 
         TiltEvent saved = tiltEventRepository.save(event);
 
+        // Send push notification if triggered and not in cooldown
         if (triggered && !isInCooldown(userId)) {
-
-            String riderName = user.getFirstName() + " " + user.getLastName();
-
-            emergencyAlertService.sendAlertsForUser(saved, riderName, customMessage);
+            sendTiltNotification(user, saved);
         }
 
         return saved;
     }
 
-    private boolean isInCooldown(UUID userId) {
+    /**
+     * Sends a push notification to the rider's phone.
+     * This notifies the RIDER themselves that a tilt was detected.
+     * The rider's app can then automatically trigger SMS to emergency contacts.
+     */
+    private void sendTiltNotification(User user, TiltEvent event) {
+        String token = user.getExpoPushToken();
 
+        if (token == null || token.isBlank()) {
+            log.warn("[Push] User {} has no Expo push token saved", user.getId());
+            return;
+        }
+
+        String title = "🚨 Tilt Alert Detected";
+        String body  = String.format(
+                "Tilt of %.1f° detected (threshold: %.1f°). Are you okay?",
+                event.getTiltAngle(),
+                event.getThreshold()
+        );
+
+        // Pass location as JSON data so the app can use it
+        String data = null;
+        if (event.getLatitude() != null && event.getLongitude() != null) {
+            data = String.format(
+                    "{\"latitude\": %f, \"longitude\": %f, \"triggered\": true}",
+                    event.getLatitude(),
+                    event.getLongitude()
+            );
+        }
+
+        expoPushService.sendPushNotification(token, title, body, data);
+    }
+
+    private boolean isInCooldown(UUID userId) {
         LocalDateTime cooldownStart =
                 LocalDateTime.now().minusSeconds(tiltConfig.getCooldownSeconds());
 
-        List<TiltEvent> events =
-                tiltEventRepository.findByUserIdAndTriggeredOrderByEventTimeDesc(userId, true);
-
-        return events.stream()
+        return tiltEventRepository
+                .findByUserIdAndTriggeredOrderByEventTimeDesc(userId, true)
+                .stream()
                 .anyMatch(e -> e.getEventTime().isAfter(cooldownStart));
     }
 
