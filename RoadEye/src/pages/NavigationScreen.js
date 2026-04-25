@@ -15,6 +15,7 @@ import {
   setDestinationWeatherTarget,
   setHelmetView,
 } from '../utils/NavigationSession'
+import HelmetUDP from '../utils/HelmetUDP'
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
@@ -40,16 +41,18 @@ export default function NavigationScreen({ navigation }) {
   }, [])
 
   // ── Helmet view helpers ───────────────────────────────────────────────────
-  // Call these whenever your Bluetooth/WiFi helmet cast starts or stops.
-  // They tell the WebView map to switch tile layer + colors.
+  // Switch the WebView map to dark-bg / white-roads tile layer for helmet cast.
+  // Also fires a UDP packet so the helmet ESP32 display knows the theme.
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
+    HelmetUDP.send({ type: 'helmetViewActive', theme: 'dark' })
   }, [injectMessage])
 
   const disableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: false })
     setHelmetView(false)
+    HelmetUDP.send({ type: 'helmetViewActive', theme: 'normal' })
   }, [injectMessage])
 
   // ── GPS ───────────────────────────────────────────────────────────────────
@@ -66,11 +69,22 @@ export default function NavigationScreen({ navigation }) {
     locationSub.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
       (loc) => {
-        const { latitude, longitude, speed } = loc.coords
+        const { latitude, longitude, speed, heading } = loc.coords
         const speedKmh = speed ? Math.round(speed * 3.6) : 0
         setGpsStatus('GPS ✓')
         updateNavSpeed(speedKmh)
+
+        // Push GPS to WebView map
         injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
+
+        // ── UDP → helmet: live position packet ───────────────────────────
+        HelmetUDP.send({
+          type:    'gps',
+          lat:     latitude,
+          lng:     longitude,
+          speed:   speedKmh,
+          heading: heading ?? 0,
+        })
       }
     )
   }, [injectMessage])
@@ -98,7 +112,16 @@ export default function NavigationScreen({ navigation }) {
           etaMin:      existing.etaMin,
         })
 
-        // If helmet view was active when user left this screen, restore it
+        // ── UDP: restore route on helmet display ─────────────────────────
+        HelmetUDP.send({
+          type:        'route',
+          destination: existing.destination.name,
+          destLat:     existing.destination.lat,
+          destLng:     existing.destination.lng,
+          distKm:      existing.distKm,
+          etaMin:      existing.etaMin,
+        })
+
         if (existing.helmetView) {
           setTimeout(() => enableHelmetView(), 800)
         }
@@ -124,20 +147,38 @@ export default function NavigationScreen({ navigation }) {
           lng:  msg.destLng,
           name: msg.destination,
         })
+
+        // ── UDP: send full route to helmet ───────────────────────────────
+        HelmetUDP.send({
+          type:        'route',
+          destination: msg.destination,
+          destLat:     msg.destLat,
+          destLng:     msg.destLng,
+          distKm:      msg.distKm,
+          etaMin:      msg.etaMin,
+        })
       }
 
       if (msg.type === 'step') {
         updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
+
+        // ── UDP: current turn instruction to helmet ──────────────────────
+        HelmetUDP.send({
+          type:  'step',
+          arrow: msg.arrow,
+          text:  msg.text,
+          dist:  msg.dist,
+        })
       }
 
       if (msg.type === 'clear' || msg.type === 'arrived') {
         sessionActive.current = false
         await stopNavSession()
+
+        // ── UDP: tell helmet to clear the route ──────────────────────────
+        HelmetUDP.send({ type: 'clear' })
       }
 
-      // helmetConnected / helmetDisconnected messages from your Bluetooth/WiFi layer
-      // These are sent by your native helmet module into the WebView, which then
-      // re-posts helmetViewToggled back — but you can also intercept here.
       if (msg.type === 'helmetViewToggled') {
         setHelmetView(msg.active)
       }
@@ -145,21 +186,25 @@ export default function NavigationScreen({ navigation }) {
     } catch (_) {}
   }, [])
 
-  // ── Helper: send helmet connect/disconnect to map (call from your BT layer) ─
-  // Export these so your HelmetBridge or BT manager can call them:
-  //   navigationScreenRef.current?.sendHelmetConnected()
-  //   navigationScreenRef.current?.sendHelmetDisconnected()
-  const sendHelmetConnected = useCallback(() => {
+  // ── Helmet connect / disconnect (called by BT/WiFi bridge) ───────────────
+  // Set the helmet IP before enabling the UDP stream.
+  const sendHelmetConnected = useCallback((helmetIp) => {
+    // Configure UDP target — default port 4210, matches ESP32 firmware
+    if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
+
     injectMessage({ type: 'helmetConnected' })
     enableHelmetView()
   }, [injectMessage, enableHelmetView])
 
   const sendHelmetDisconnected = useCallback(() => {
+    HelmetUDP.send({ type: 'clear' })
+    HelmetUDP.destroy()
+
     injectMessage({ type: 'helmetDisconnected' })
     disableHelmetView()
   }, [injectMessage, disableHelmetView])
 
-  // ── App background/foreground ─────────────────────────────────────────────
+  // ── App background / foreground ───────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
@@ -178,14 +223,16 @@ export default function NavigationScreen({ navigation }) {
     return () => sub.remove()
   }, [startGPS])
 
-  // ── Mount/unmount ─────────────────────────────────────────────────────────
+  // ── Mount / unmount ───────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
     if (existing.active) sessionActive.current = true
+
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // Session intentionally NOT stopped on unmount — must survive screen changes
+      // Session intentionally NOT stopped — must survive screen changes
+      // UDP stays open so background location still feeds the helmet
     }
   }, [])
 
@@ -200,6 +247,7 @@ export default function NavigationScreen({ navigation }) {
           {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
+              HelmetUDP.send({ type: 'clear' })
               await stopNavSession()
               sessionActive.current = false
               navigation.goBack()

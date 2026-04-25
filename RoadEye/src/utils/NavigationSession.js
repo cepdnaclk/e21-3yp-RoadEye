@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
 import * as Notifications from 'expo-notifications'
+import HelmetUDP from './HelmetUDP'
 
 export const NAV_TASK = 'ROADEYE_NAV_TASK'
 
-// ── Internal singleton state ─────────────────────────────────────────────────
+// ── Internal singleton state ──────────────────────────────────────────────────
 let _state = {
   active:      false,
   destination: null,   // { name, lat, lng }
@@ -14,14 +15,14 @@ let _state = {
   etaMin:      null,
   currentStep: null,   // { arrow, text, dist }
   speed:       0,
-  helmetView:  false,  // true when map is in helmet black/white mode
+  helmetView:  false,
 }
 let _listeners    = new Set()
 let _destWeatherCb = null
 
 const notify = () => _listeners.forEach(fn => fn({ ..._state }))
 
-// ── WeatherCard destination bridge ───────────────────────────────────────────
+// ── WeatherCard destination bridge ────────────────────────────────────────────
 export const registerDestWeatherListener   = (cb) => { _destWeatherCb = cb }
 export const unregisterDestWeatherListener = ()    => { _destWeatherCb = null }
 
@@ -30,9 +31,8 @@ export const setDestinationWeatherTarget = (target) => {
 }
 
 // ── Helmet view state ─────────────────────────────────────────────────────────
-// Called by NavigationScreen when the map switches to/from helmet display mode.
-// Other screens can read this via useNavSession() → state.helmetView
-// or synchronously via getNavState().helmetView
+// true  = map is in dark-bg / white-roads helmet mode
+// false = normal map colours
 export const setHelmetView = (active) => {
   _state = { ..._state, helmetView: active }
   notify()
@@ -52,6 +52,16 @@ export const updateNavStep = (step) => {
   _state = { ..._state, currentStep: step }
   notify()
   updateNotification(step?.text, step?.dist)
+
+  // ── UDP: forward step to helmet display ──────────────────────────────────
+  if (step) {
+    HelmetUDP.send({
+      type:  'step',
+      arrow: step.arrow,
+      text:  step.text,
+      dist:  step.dist,
+    })
+  }
 }
 
 export const updateNavSpeed = (speed) => {
@@ -67,10 +77,11 @@ export const stopNavSession = async () => {
     etaMin:      null,
     currentStep: null,
     speed:       0,
-    helmetView:  false,  // reset helmet view on session stop
+    helmetView:  false,
   }
   notify()
   setDestinationWeatherTarget(null)
+  HelmetUDP.send({ type: 'clear' })
   await Notifications.dismissAllNotificationsAsync()
   try { await Location.stopLocationUpdatesAsync(NAV_TASK) } catch (_) {}
 }
@@ -89,12 +100,25 @@ export const useNavSession = () => {
 }
 
 // ── Background location task ──────────────────────────────────────────────────
+// Runs when the app is backgrounded during active navigation.
+// Sends GPS packets directly to the helmet via UDP so the helmet map
+// stays live even when the phone screen is off.
 TaskManager.defineTask(NAV_TASK, ({ data, error }) => {
   if (error) { console.warn('[NavTask]', error); return }
   if (data?.locations?.length) {
-    const { latitude, longitude, speed } = data.locations[0].coords
+    const { latitude, longitude, speed, heading } = data.locations[0].coords
     const kmh = speed ? Math.round(speed * 3.6) : _state.speed
     updateNavSpeed(kmh)
+
+    // ── UDP: background GPS → helmet ─────────────────────────────────────
+    HelmetUDP.send({
+      type:    'gps',
+      lat:     latitude,
+      lng:     longitude,
+      speed:   kmh,
+      heading: heading ?? 0,
+    })
+
     try {
       const { broadcastHelmet } = require('./HelmetBridge')
       broadcastHelmet({ type: 'location', lat: latitude, lng: longitude, speed: kmh })
