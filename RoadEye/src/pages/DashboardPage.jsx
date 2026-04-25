@@ -1,4 +1,3 @@
-// src/pages/DashboardPage.js
 import { useState, useCallback } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
@@ -14,13 +13,9 @@ import MusicPlayer     from '../components/dashboard/MusicPlayer'
 import StatsChart      from '../components/dashboard/StatsChart'
 import BottomNav       from '../components/dashboard/BottomNav'
 
-// Import HELMET_STATE so the comparison is always in sync with the hook
-import { HELMET_STATE } from '../hooks/useHelmetConnection'
-
 const C = colors
 
 // ── Static fallback stats (shown before helmet connects) ──────────────────────
-// helmetKey must match the field names parsed in useHelmetConnection / HelmetUDP
 const DEFAULT_WEEK_STATS = [
   { icon: '🚴', label: 'Stability score',      val: 68,  helmetKey: 'stability' },
   { icon: '🛑', label: 'Aggressive Brakings',  val: 35,  helmetKey: 'brakingCount' },
@@ -39,25 +34,23 @@ export default function DashboardPage() {
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
-  // ── Live helmet state ─────────────────────────────────────────────────────
-  const [helmetData,      setHelmetData]      = useState(null)
-  const [connectionState, setConnectionState] = useState(HELMET_STATE.DISCONNECTED)
+  // ── Live helmet data state ────────────────────────────────────────────────
+  const [helmetData, setHelmetData]             = useState(null)
+  const [helmetConnected, setHelmetConnected]   = useState(false)
 
-  // Derived boolean — compare against the constant, not a raw string
-  const helmetConnected = connectionState === HELMET_STATE.CONNECTED
-
-  // Called by DashboardHeader → HelmetConnectButton whenever new sensor data
-  // arrives from the ESP32 (PKT_SENSOR_OUT / PKT_IMU_OUT / PKT_WEAR_OUT)
+  // Called by DashboardHeader → HelmetConnectButton whenever new data arrives
   const handleHelmetData = useCallback((data) => {
     if (data) setHelmetData(data)
   }, [])
 
-  // Called on every HELMET_STATE transition
+  // Called by DashboardHeader → HelmetConnectButton on state changes
   const handleConnectionChange = useCallback((state) => {
-    setConnectionState(state)
+    setHelmetConnected(state === 'connected')
   }, [])
 
   // ── Merge live helmet data into weekStats ─────────────────────────────────
+  // If helmet is connected and has a value for a stat's helmetKey, use it.
+  // Otherwise fall back to the static default value.
   const weekStats = DEFAULT_WEEK_STATS.map(stat => ({
     ...stat,
     val: (helmetConnected && helmetData?.[stat.helmetKey] !== undefined)
@@ -66,44 +59,17 @@ export default function DashboardPage() {
     live: helmetConnected && helmetData?.[stat.helmetKey] !== undefined,
   }))
 
-  // ── Live average speed from helmet (PKT_SENSOR_OUT forwardAccel proxy) ────
-  // Replace with a real speed field once you extend the protocol if needed.
-  const liveSpeed = helmetConnected && helmetData?.speed != null
-    ? `${helmetData.speed} km/h`
-    : '40 km/h'
-
-  // ── Wear state badge ──────────────────────────────────────────────────────
-  const wearState = helmetConnected ? helmetData?.wearState : null
-
   // Live session state
   const navSession = useNavSession()
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-
-      {/* DashboardHeader owns the helmet connect button, bubbles data up */}
+      {/* DashboardHeader now owns the helmet connect button and bubbles data up */}
       <DashboardHeader
         onLogout={logout}
         onHelmetData={handleHelmetData}
         onConnectionChange={handleConnectionChange}
       />
-
-      {/* ── Helmet wear-state banner (shown when helmet is on head) ── */}
-      {helmetConnected && wearState && (
-        <View style={[
-          styles.wearBanner,
-          wearState === 'ACTIVE' && styles.wearBannerActive,
-          wearState === 'IDLE'   && styles.wearBannerIdle,
-        ]}>
-          <View style={styles.wearDot} />
-          <Text style={styles.wearText}>
-            Helmet {wearState === 'ACTIVE' ? '• Riding' : wearState === 'IDLE' ? '• Idle' : '• Sleeping'}
-          </Text>
-          {helmetData?.temperature != null && (
-            <Text style={styles.wearTemp}>{helmetData.temperature.toFixed(1)}°C</Text>
-          )}
-        </View>
-      )}
 
       {/* ── Live navigation banner ── */}
       {navSession.active && (
@@ -141,15 +107,8 @@ export default function DashboardPage() {
                 <Text style={styles.highlightLabel}>{h.label}</Text>
                 <Text style={styles.highlightIcon}>{h.icon}</Text>
               </View>
-              {/* Show live speed if helmet is connected */}
-              <Text style={styles.highlightVal}>
-                {h.label === 'Average Speed' ? liveSpeed : h.value}
-              </Text>
-              <Text style={styles.highlightSub}>
-                {h.label === 'Average Speed' && helmetConnected
-                  ? 'live from helmet'
-                  : h.sub}
-              </Text>
+              <Text style={styles.highlightVal}>{h.value}</Text>
+              <Text style={styles.highlightSub}>{h.sub}</Text>
             </View>
           ))}
         </View>
@@ -161,6 +120,7 @@ export default function DashboardPage() {
             <View key={s.label} style={[styles.statCard, s.live && styles.statCardLive]}>
               <View style={styles.statCardTop}>
                 <Text style={{ fontSize: 16 }}>{s.icon}</Text>
+                {/* Green pulse dot when this value is live from helmet */}
                 {s.live && <View style={styles.liveDot} />}
               </View>
               <Text style={styles.statLabel}>{s.label}</Text>
@@ -169,37 +129,9 @@ export default function DashboardPage() {
           ))}
         </View>
 
-        {/* ── Live sensor strip (only when helmet connected) ── */}
-        {helmetConnected && helmetData && (
-          <>
-            <SectionHeader title="Live Sensors" />
-            <View style={styles.sensorStrip}>
-              <SensorPill
-                icon="↑" label="Fwd Accel"
-                value={helmetData.forwardAccel != null
-                  ? `${helmetData.forwardAccel.toFixed(2)} g` : '—'}
-              />
-              <SensorPill
-                icon="↔" label="Roll"
-                value={helmetData.roll != null
-                  ? `${helmetData.roll.toFixed(1)}°` : '—'}
-              />
-              <SensorPill
-                icon="◀ ▶" label="Dist L/R"
-                value={(helmetData.distLeft != null && helmetData.distRight != null)
-                  ? `${helmetData.distLeft.toFixed(1)}/${helmetData.distRight.toFixed(1)} m` : '—'}
-              />
-              <SensorPill
-                icon="▼" label="Rear Dist"
-                value={helmetData.distRear != null
-                  ? `${helmetData.distRear.toFixed(1)} m` : '—'}
-              />
-            </View>
-          </>
-        )}
-
         <SectionHeader title="Navigation" />
 
+        {/* Navigation button — changes appearance when active */}
         <TouchableOpacity
           style={[styles.navBtn, navSession.active && styles.navBtnActive]}
           onPress={() => navigation.navigate('Navigation')}
@@ -277,48 +209,19 @@ function SectionHeader({ title }) {
   )
 }
 
-// ── Live sensor pill ──────────────────────────────────────────────────────────
-function SensorPill({ icon, label, value }) {
-  return (
-    <View style={styles.sensorPill}>
-      <Text style={styles.sensorIcon}>{icon}</Text>
-      <Text style={styles.sensorLabel}>{label}</Text>
-      <Text style={styles.sensorValue}>{value}</Text>
-    </View>
-  )
-}
-
 // ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   screen:            { flex: 1, backgroundColor: C.bg },
   scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
-
-  // Wear state banner
-  wearBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    paddingHorizontal: 16, paddingVertical: 7,
-    backgroundColor: '#f0fdf4',
-    borderBottomWidth: 1, borderBottomColor: '#bbf7d0',
-  },
-  wearBannerActive: { backgroundColor: '#f0fdf4', borderBottomColor: '#4ade80' },
-  wearBannerIdle:   { backgroundColor: '#fefce8', borderBottomColor: '#fde047' },
-  wearDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#16a34a' },
-  wearText: { flex: 1, fontSize: 12, fontWeight: '600', color: '#15803d' },
-  wearTemp: { fontSize: 12, fontWeight: '700', color: '#15803d' },
-
-  // Odometer
   odometerWrap:      { alignItems: 'center', marginBottom: 20, position: 'relative' },
   odometerLabel:     { position: 'absolute', bottom: 10, alignItems: 'center' },
   odometerVal:       { fontSize: 22, fontWeight: '800', color: '#1a1a2e' },
   odometerBadge:     { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
   odometerBadgeText: { fontSize: 10, color: '#8892A4', fontWeight: '500' },
-
   sectionHeader:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, marginTop: 4 },
   sectionTitle:      { fontSize: 17, fontWeight: '800', color: C.text },
   viewMore:          { fontSize: 12, color: C.muted, fontWeight: '500' },
   grid:              { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
-
-  // Highlight cards
   highlightCard:     { flex: 1, minWidth: '45%', borderRadius: 16, padding: 14 },
   highlightTop:      { flexDirection: 'row', justifyContent: 'space-between' },
   highlightLabel:    { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
@@ -327,42 +230,33 @@ const styles = StyleSheet.create({
   highlightSub:      { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
 
   // Stat cards
-  statCard: {
+  statCard:          {
     flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14,
     padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06, shadowRadius: 4, elevation: 1,
   },
-  statCardLive:  { borderWidth: 1.5, borderColor: '#4ade80' },
-  statCardTop:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  statLabel:     { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
-  statVal:       { fontSize: 22, fontWeight: '800', color: C.text },
-  statValLive:   { color: '#16a34a' },
-  liveDot:       { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-
-  // Live sensor strip
-  sensorStrip: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16,
-  },
-  sensorPill: {
-    flex: 1, minWidth: '45%',
-    backgroundColor: '#0f172a',
-    borderRadius: 12, padding: 10,
-    alignItems: 'center',
-  },
-  sensorIcon:  { fontSize: 14, color: '#00dca0', marginBottom: 2 },
-  sensorLabel: { fontSize: 10, color: 'rgba(255,255,255,0.5)', fontWeight: '600', marginBottom: 3 },
-  sensorValue: { fontSize: 14, fontWeight: '800', color: '#fff', fontFamily: 'monospace' },
+  // Subtle green border when showing live data
+  statCardLive:      { borderWidth: 1.5, borderColor: '#4ade80' },
+  statCardTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
+  statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
+  statValLive:       { color: '#16a34a' },   // green when live
+  liveDot:           { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
 
   // Nav button
   navBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16,
   },
-  navBtnActive: { backgroundColor: '#2a0a0a', borderWidth: 1.5, borderColor: '#ff3b30' },
-  navBtnIcon:   { fontSize: 28 },
-  navBtnTitle:  { fontSize: 15, fontWeight: '800', color: '#fff' },
-  navBtnSub:    { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-  navBtnArrow:  { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
+  navBtnActive: {
+    backgroundColor: '#2a0a0a',
+    borderWidth: 1.5,
+    borderColor: '#ff3b30',
+  },
+  navBtnIcon:  { fontSize: 28 },
+  navBtnTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
+  navBtnSub:   { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  navBtnArrow: { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
 })
 
 const banner = StyleSheet.create({
@@ -372,15 +266,31 @@ const banner = StyleSheet.create({
     borderBottomWidth: 1.5, borderBottomColor: '#ff3b30',
     paddingHorizontal: 16, paddingVertical: 10,
   },
-  title:      { fontSize: 13, fontWeight: '700', color: '#fff' },
-  step:       { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
-  resumeBtn:  { backgroundColor: 'rgba(255,59,48,0.15)', borderWidth: 1, borderColor: '#ff3b30', borderRadius: 5, paddingHorizontal: 10, paddingVertical: 5 },
+  title: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  step:  { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
+  resumeBtn: {
+    backgroundColor: 'rgba(255,59,48,0.15)',
+    borderWidth: 1, borderColor: '#ff3b30',
+    borderRadius: 5, paddingHorizontal: 10, paddingVertical: 5,
+  },
   resumeText: { fontSize: 11, fontWeight: '800', color: '#ff3b30', letterSpacing: 0.8 },
-  stopBtn:    { width: 30, height: 30, borderRadius: 5, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' },
-  stopText:   { fontSize: 13, color: '#fff', fontWeight: '800' },
+  stopBtn: {
+    width: 30, height: 30, borderRadius: 5,
+    backgroundColor: '#ff3b30',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  stopText: { fontSize: 13, color: '#fff', fontWeight: '800' },
 })
 
 const dot = StyleSheet.create({
-  wrap:  { width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,59,48,0.25)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  inner: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#ff3b30' },
+  wrap: {
+    width: 14, height: 14, borderRadius: 7,
+    backgroundColor: 'rgba(255,59,48,0.25)',
+    alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  },
+  inner: {
+    width: 7, height: 7, borderRadius: 3.5,
+    backgroundColor: '#ff3b30',
+  },
 })

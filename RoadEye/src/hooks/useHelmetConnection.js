@@ -1,209 +1,215 @@
-// src/hooks/useHelmetConnection.js
-// Manages the full WiFi → UDP connection lifecycle for the ESP32 helmet.
-//
-// Works with the binary PCLink protocol (HelmetUDP.js).
-// Receives live sensor / IMU / wear data from the helmet and exposes it
-// via helmetData so HelmetConnectButton can render it.
-//
-// States:
-//   DISCONNECTED → connect(ip) → CONNECTING → CONNECTED
-//   CONNECTED    → disconnect()             → DISCONNECTED
-//   CONNECTING   → timeout / error          → ERROR → connect() → CONNECTING
-
 import { useState, useEffect, useRef, useCallback } from 'react'
 import HelmetUDP from '../utils/HelmetUDP'
 
-// ── State machine constants ────────────────────────────────────────────────────
 export const HELMET_STATE = {
-  DISCONNECTED: 'DISCONNECTED',
-  SCANNING:     'SCANNING',
-  CONNECTING:   'CONNECTING',
-  CONNECTED:    'CONNECTED',
-  ERROR:        'ERROR',
+  DISCONNECTED: 'disconnected',
+  SCANNING: 'scanning',
+  CONNECTING: 'connecting',
+  CONNECTED: 'connected',
+  ERROR: 'error',
 }
 
-const DEFAULT_IP   = '192.168.1.100'   // edit to your ESP32's usual IP
-const CONNECT_TIMEOUT_MS = 6000        // give up if no PONG arrives in 6 s
-const PING_INTERVAL_MS   = 3000        // keepalive sent by HelmetUDP itself
-const MAX_LOG_LINES      = 60
-
-// ── Helper ────────────────────────────────────────────────────────────────────
-function makeLogEntry(msg, type = 'info') {
-  return { msg, type, ts: Date.now() }
+const DEFAULT_CONFIG = {
+  port: 4210,
+  reconnectAttempts: 3,
+  reconnectDelay: 2000,
+  connectionTimeout: 6000,
+  pingInterval: 3000,
 }
 
-// Signal strength: map pong round-trip latency → 0-4 bars
-function latencyToSignal(ms) {
-  if (ms < 30)  return 4
-  if (ms < 80)  return 3
-  if (ms < 150) return 2
-  if (ms < 300) return 1
-  return 0
-}
+export function useHelmetConnection(config = {}) {
+  const cfg = { ...DEFAULT_CONFIG, ...config }
 
-// ─────────────────────────────────────────────────────────────────────────────
-export function useHelmetConnection() {
   const [connectionState, setConnectionState] = useState(HELMET_STATE.DISCONNECTED)
-  const [helmetData,      setHelmetData]      = useState(null)
-  const [error,           setError]           = useState(null)
-  const [signal,          setSignal]          = useState(0)
-  const [log,             setLog]             = useState([])
-  const [helmetIp,        setHelmetIp]        = useState(DEFAULT_IP)
+  const [helmetData, setHelmetData] = useState(null)
+  const [error, setError] = useState(null)
+  const [signal, setSignal] = useState(0)
+  const [log, setLog] = useState([])
+  const [helmetIp, setHelmetIp] = useState('10.206.142.140')
 
-  const connectTimerRef = useRef(null)
-  const pingTimerRef    = useRef(null)
-  const pingTs          = useRef(null)   // timestamp of last outbound ping
-  const isMounted       = useRef(true)
+  const mountedRef       = useRef(true)
+  const reconnectCount   = useRef(0)
+  const connectTimeoutRef = useRef(null)
+  const reconnectTimerRef = useRef(null)
+  const pingTimerRef     = useRef(null)
+  const lastPongRef      = useRef(0)
+  const sensorRef        = useRef({})
+  const imuRef           = useRef({})
 
-  // ── Derived booleans ───────────────────────────────────────────────────────
-  const isConnected = connectionState === HELMET_STATE.CONNECTED
-  const isScanning  = connectionState === HELMET_STATE.SCANNING ||
-                      connectionState === HELMET_STATE.CONNECTING
-
-  // ── Log helper ─────────────────────────────────────────────────────────────
-  const addLog = useCallback((msg, type = 'info') => {
-    if (!isMounted.current) return
-    setLog(prev => {
-      const next = [...prev, makeLogEntry(msg, type)]
-      return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next
-    })
-  }, [])
-
-  // ── State helper ───────────────────────────────────────────────────────────
-  const setState = useCallback((s) => {
-    if (isMounted.current) setConnectionState(s)
-  }, [])
-
-  // ── Connect ────────────────────────────────────────────────────────────────
-  const connect = useCallback((ip) => {
-    const targetIp = ip || helmetIp
-    addLog(`Connecting to ${targetIp}:4210…`, 'info')
-    setState(HELMET_STATE.CONNECTING)
-    setError(null)
-
-    // Register callbacks BEFORE opening the socket so no data is missed
-    HelmetUDP.onPong = () => {
-      if (!isMounted.current) return
-
-      // Measure round-trip
-      const rtt = pingTs.current ? Date.now() - pingTs.current : 999
-      setSignal(latencyToSignal(rtt))
-
-      if (connectionState !== HELMET_STATE.CONNECTED) {
-        // First pong → we're connected
-        clearTimeout(connectTimerRef.current)
-        setState(HELMET_STATE.CONNECTED)
-        addLog(`Connected to ${targetIp}  RTT ${rtt} ms`, 'success')
-      }
-    }
-
-    HelmetUDP.onSensor = (data) => {
-      if (!isMounted.current) return
-      setHelmetData(prev => ({
-        ...prev,
-        // Map PCLink sensor fields to what HelmetConnectButton's DataPills expect:
-        speed:        prev?.speed ?? 0,    // speed comes from GPS telemetry
-        accel:        parseFloat(data.forwardAccel?.toFixed(2)) ?? 0,
-        batteryLevel: null,                // ESP32 doesn't send battery in this protocol
-        // Raw fields for advanced consumers:
-        distLeft:     data.distLeft,
-        distRight:    data.distRight,
-        distRear:     data.distRear,
-        roll:         data.roll,
-        temperature:  data.temperature,
-        humidity:     data.humidity,
-        vibration:    data.vibration,
-        isRiding:     data.isRiding,
-      }))
-      addLog(
-        `Sensor  dist L/R/R: ${data.distLeft?.toFixed(1)}/${data.distRight?.toFixed(1)}/${data.distRear?.toFixed(1)} m  accel: ${data.forwardAccel?.toFixed(2)} g`,
-        'data'
-      )
-    }
-
-    HelmetUDP.onImu = (data) => {
-      if (!isMounted.current) return
-      setHelmetData(prev => ({
-        ...prev,
-        imu: {
-          accelX: data.accelX,
-          accelY: data.accelY,
-          accelZ: data.accelZ,
-          gyroX:  data.gyroX,
-          gyroY:  data.gyroY,
-          gyroZ:  data.gyroZ,
-        },
-      }))
-      // Only log occasionally to avoid flooding
-      if (Math.random() < 0.05) {
-        addLog(
-          `IMU  a:(${data.accelX?.toFixed(2)}, ${data.accelY?.toFixed(2)}, ${data.accelZ?.toFixed(2)})  g:(${data.gyroX?.toFixed(1)}, ${data.gyroY?.toFixed(1)}, ${data.gyroZ?.toFixed(1)})`,
-          'data'
-        )
-      }
-    }
-
-    HelmetUDP.onWear = (data) => {
-      if (!isMounted.current) return
-      setHelmetData(prev => ({ ...prev, wearState: data.state }))
-      addLog(`Wear state → ${data.state}`, 'info')
-    }
-
-    // Open UDP socket pointed at the helmet
-    HelmetUDP.setTarget(targetIp, 4210)
-
-    // Send initial ping — reply triggers the CONNECTED state above
-    pingTs.current = Date.now()
-    HelmetUDP.sendPing()
-
-    // Timeout: if no PONG arrives within CONNECT_TIMEOUT_MS, give up
-    connectTimerRef.current = setTimeout(() => {
-      if (!isMounted.current) return
-      if (connectionState !== HELMET_STATE.CONNECTED) {
-        setState(HELMET_STATE.ERROR)
-        setError(`No response from ${targetIp} — check IP and WiFi`)
-        addLog(`Timeout — no PONG from ${targetIp}`, 'error')
-        HelmetUDP.destroy()
-      }
-    }, CONNECT_TIMEOUT_MS)
-
-    // Update latency / signal every PING_INTERVAL_MS while connected
-    pingTimerRef.current = setInterval(() => {
-      if (connectionState === HELMET_STATE.CONNECTED) {
-        pingTs.current = Date.now()
-        // HelmetUDP already sends its own pings; this just timestamps them
-      }
-    }, PING_INTERVAL_MS)
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [helmetIp, addLog, setState])
-
-  // ── Disconnect ─────────────────────────────────────────────────────────────
-  const disconnect = useCallback(() => {
-    clearTimeout(connectTimerRef.current)
-    clearInterval(pingTimerRef.current)
-
-    HelmetUDP.onSensor = null
-    HelmetUDP.onImu    = null
-    HelmetUDP.onWear   = null
-    HelmetUDP.onPong   = null
-    HelmetUDP.destroy()
-
-    setState(HELMET_STATE.DISCONNECTED)
-    setHelmetData(null)
-    setSignal(0)
-    addLog('Disconnected', 'info')
-  }, [addLog, setState])
-
-  // ── Cleanup on unmount ─────────────────────────────────────────────────────
+  // FIX: keep a ref that always mirrors connectionState so callbacks and
+  // timers can read the current value without capturing a stale closure.
+  const connectionStateRef = useRef(connectionState)
   useEffect(() => {
-    isMounted.current = true
-    return () => {
-      isMounted.current = false
-      clearTimeout(connectTimerRef.current)
-      clearInterval(pingTimerRef.current)
-    }
+    connectionStateRef.current = connectionState
+  }, [connectionState])
+
+  const addLog = useCallback((msg, type = 'info') => {
+    if (!mountedRef.current) return
+    setLog(prev => [...prev, { msg, type, ts: Date.now() }].slice(-30))
   }, [])
+
+  const clearTimers = useCallback(() => {
+    clearTimeout(connectTimeoutRef.current)
+    clearTimeout(reconnectTimerRef.current)
+    clearInterval(pingTimerRef.current)
+  }, [])
+
+  const publishData = useCallback((patch) => {
+    setHelmetData(prev => ({ ...(prev || {}), ...patch, timestamp: Date.now() }))
+  }, [])
+
+  const markConnected = useCallback(() => {
+    clearTimeout(connectTimeoutRef.current)
+    reconnectCount.current = 0
+    lastPongRef.current = Date.now()
+    setError(null)
+    setSignal(4)
+    setConnectionState(HELMET_STATE.CONNECTED)
+  }, [])
+
+  // FIX: handleFailure is defined with useRef so it doesn't need to be in
+  // connect()'s dep array. This breaks the circular dep chain:
+  //   connect → handleFailure → connect (retry) → ...
+  // Using a ref means the latest version is always called without needing
+  // it in any dependency array.
+  const handleFailureRef = useRef(null)
+
+  const disconnect = useCallback(() => {
+    clearTimers()
+    reconnectCount.current = 0
+    lastPongRef.current = 0
+    HelmetUDP.destroy()
+    setSignal(0)
+    setHelmetData(null)
+    setConnectionState(HELMET_STATE.DISCONNECTED)
+    addLog('Disconnected', 'info')
+  }, [addLog, clearTimers])
+
+  // FIX: startPing no longer depends on connectionState directly.
+  // Instead it reads connectionStateRef.current inside the interval callback
+  // so it always sees the latest value without being recreated on every
+  // state change (which was resetting the interval repeatedly).
+  const startPing = useCallback((ip) => {
+    clearInterval(pingTimerRef.current)
+    HelmetUDP.send({ type: 'ping' })
+
+    pingTimerRef.current = setInterval(() => {
+      HelmetUDP.send({ type: 'ping' })
+
+      // Read current state via ref — avoids stale closure
+      if (
+        connectionStateRef.current === HELMET_STATE.CONNECTED &&
+        lastPongRef.current &&
+        Date.now() - lastPongRef.current > cfg.connectionTimeout * 2
+      ) {
+        addLog('Helmet timeout: no PONG received', 'error')
+        handleFailureRef.current?.(ip)
+      }
+    }, cfg.pingInterval)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addLog, cfg.connectionTimeout, cfg.pingInterval])
+  // NOTE: connectionState intentionally removed from deps — we use the ref.
+
+  // FIX: connect is defined with useCallback but startPing is now stable
+  // (no longer depends on connectionState), so this dep array is stable too.
+  const connect = useCallback((ip) => {
+    const targetIp = (ip || helmetIp || '').trim()
+    if (!targetIp) return
+
+    clearTimers()
+    HelmetUDP.destroy()
+    setHelmetIp(targetIp)
+    setHelmetData(null)
+    setError(null)
+    setLog([])
+    setSignal(0)
+    setConnectionState(HELMET_STATE.CONNECTING)
+    addLog(`Opening UDP link to ${targetIp}:${cfg.port}`, 'info')
+
+    HelmetUDP.onPong = () => {
+      addLog('PONG received. Helmet connected.', 'success')
+      markConnected()
+    }
+
+    HelmetUDP.onSensor = (sensor) => {
+      sensorRef.current = sensor
+      publishData({
+        ...sensorRef.current,
+        ...imuRef.current,
+        speed: sensor.forwardAccel
+          ? Math.abs(sensor.forwardAccel * 10).toFixed(1)
+          : 0,
+        accel:          sensor.forwardAccel,
+        stability:      Math.max(0, Math.min(100, Math.round(100 - Math.abs(sensor.roll || 0)))),
+        brakingCount:   sensor.forwardAccel < -0.6 ? 1 : 0,
+        accelCount:     sensor.forwardAccel > 0.6  ? 1 : 0,
+        sharpTurnCount: Math.abs(sensor.roll || 0) > 35 ? 1 : 0,
+        batteryLevel:   100,
+      })
+      // FIX: read via ref so this callback never uses a stale state value
+      if (connectionStateRef.current !== HELMET_STATE.CONNECTED) markConnected()
+    }
+
+    HelmetUDP.onImu = (imu) => {
+      imuRef.current = imu
+      publishData({ ...sensorRef.current, ...imuRef.current })
+      if (connectionStateRef.current !== HELMET_STATE.CONNECTED) markConnected()
+    }
+
+    HelmetUDP.onWear = (wearState) => {
+      publishData({ wearState })
+      if (connectionStateRef.current !== HELMET_STATE.CONNECTED) markConnected()
+    }
+
+    HelmetUDP.setTarget(targetIp, cfg.port)
+    startPing(targetIp)
+
+    connectTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current && lastPongRef.current === 0) {
+        addLog('Connection timeout: no UDP reply from helmet', 'error')
+        handleFailureRef.current?.(targetIp)
+      }
+    }, cfg.connectionTimeout)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [helmetIp, cfg.port, cfg.connectionTimeout, addLog, clearTimers, markConnected, publishData, startPing])
+
+  // FIX: assign handleFailure to the ref AFTER connect is defined so the
+  // retry inside handleFailure can call the latest connect without creating
+  // a circular dependency in the dep arrays.
+  useEffect(() => {
+    handleFailureRef.current = (ip) => {
+      clearTimers()
+      setSignal(0)
+
+      if (reconnectCount.current < cfg.reconnectAttempts) {
+        reconnectCount.current += 1
+        setConnectionState(HELMET_STATE.SCANNING)
+        addLog(`Retry ${reconnectCount.current}/${cfg.reconnectAttempts} in ${cfg.reconnectDelay / 1000}s`, 'info')
+        reconnectTimerRef.current = setTimeout(() => connect(ip), cfg.reconnectDelay)
+        return
+      }
+
+      reconnectCount.current = 0
+      HelmetUDP.destroy()
+      setConnectionState(HELMET_STATE.ERROR)
+      setError(`Could not reach helmet at ${ip}:4210. Check same WiFi/hotspot and ESP32 IP.`)
+      addLog('Max retries reached. Check helmet WiFi and IP.', 'error')
+    }
+  }, [addLog, clearTimers, cfg.reconnectAttempts, cfg.reconnectDelay, connect])
+
+  const sendCommand = useCallback((cmd, payload = {}) => {
+    if (connectionStateRef.current !== HELMET_STATE.CONNECTED) return false
+    HelmetUDP.send({ type: cmd, ...payload })
+    return true
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      disconnect()
+    }
+  }, [disconnect])
 
   return {
     connectionState,
@@ -215,7 +221,9 @@ export function useHelmetConnection() {
     setHelmetIp,
     connect,
     disconnect,
-    isConnected,
-    isScanning,
+    sendCommand,
+    isConnected: connectionState === HELMET_STATE.CONNECTED,
+    isScanning:  connectionState === HELMET_STATE.SCANNING ||
+                 connectionState === HELMET_STATE.CONNECTING,
   }
 }
