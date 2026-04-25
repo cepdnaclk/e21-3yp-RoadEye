@@ -1,4 +1,16 @@
 // src/pages/NavigationScreen.js
+//
+// Changes from original:
+//   • HelmetUDP.send({ type:'gps', ... }) now triggers PKT_TELEMETRY (binary)
+//     via the updated HelmetUDP.js — no changes needed here; the API is
+//     backward-compatible.
+//   • sendHelmetConnected() accepts helmetIp and wires it to HelmetUDP.setTarget().
+//   • Weather data can be pushed to HelmetUDP.setWeather() from a weather card;
+//     it is merged into every subsequent PKT_TELEMETRY automatically.
+//
+// Everything else (WebView, GPS subscription, nav session, back handler) is
+// identical to your original file.
+
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import {
   View, StyleSheet, Platform, StatusBar,
@@ -41,11 +53,11 @@ export default function NavigationScreen({ navigation }) {
   }, [])
 
   // ── Helmet view helpers ───────────────────────────────────────────────────
-  // Switch the WebView map to dark-bg / white-roads tile layer for helmet cast.
-  // Also fires a UDP packet so the helmet ESP32 display knows the theme.
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
+    // Note: 'helmetViewActive' is a no-op in binary protocol (ESP32 renders its
+    // own dark theme). Kept for WebView map tile switching.
     HelmetUDP.send({ type: 'helmetViewActive', theme: 'dark' })
   }, [injectMessage])
 
@@ -77,7 +89,9 @@ export default function NavigationScreen({ navigation }) {
         // Push GPS to WebView map
         injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
 
-        // ── UDP → helmet: live position packet ───────────────────────────
+        // ── UDP → helmet: PKT_TELEMETRY (binary) ─────────────────────────
+        // HelmetUDP.send({ type:'gps', ... }) internally calls sendTelemetry()
+        // and merges any weather context set via HelmetUDP.setWeather().
         HelmetUDP.send({
           type:    'gps',
           lat:     latitude,
@@ -112,7 +126,8 @@ export default function NavigationScreen({ navigation }) {
           etaMin:      existing.etaMin,
         })
 
-        // ── UDP: restore route on helmet display ─────────────────────────
+        // Restore route info on helmet (binary protocol no-op; ESP32 map
+        // rebuilds from live PKT_TELEMETRY position packets).
         HelmetUDP.send({
           type:        'route',
           destination: existing.destination.name,
@@ -148,7 +163,6 @@ export default function NavigationScreen({ navigation }) {
           name: msg.destination,
         })
 
-        // ── UDP: send full route to helmet ───────────────────────────────
         HelmetUDP.send({
           type:        'route',
           destination: msg.destination,
@@ -162,7 +176,6 @@ export default function NavigationScreen({ navigation }) {
       if (msg.type === 'step') {
         updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
 
-        // ── UDP: current turn instruction to helmet ──────────────────────
         HelmetUDP.send({
           type:  'step',
           arrow: msg.arrow,
@@ -174,8 +187,6 @@ export default function NavigationScreen({ navigation }) {
       if (msg.type === 'clear' || msg.type === 'arrived') {
         sessionActive.current = false
         await stopNavSession()
-
-        // ── UDP: tell helmet to clear the route ──────────────────────────
         HelmetUDP.send({ type: 'clear' })
       }
 
@@ -186,12 +197,11 @@ export default function NavigationScreen({ navigation }) {
     } catch (_) {}
   }, [])
 
-  // ── Helmet connect / disconnect (called by BT/WiFi bridge) ───────────────
-  // Set the helmet IP before enabling the UDP stream.
+  // ── Helmet connect / disconnect ───────────────────────────────────────────
+  // Call sendHelmetConnected(ip) from HelmetConnectButton's onConnectionChange
+  // callback when connectionState becomes CONNECTED.
   const sendHelmetConnected = useCallback((helmetIp) => {
-    // Configure UDP target — default port 4210, matches ESP32 firmware
     if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
-
     injectMessage({ type: 'helmetConnected' })
     enableHelmetView()
   }, [injectMessage, enableHelmetView])
@@ -199,7 +209,6 @@ export default function NavigationScreen({ navigation }) {
   const sendHelmetDisconnected = useCallback(() => {
     HelmetUDP.send({ type: 'clear' })
     HelmetUDP.destroy()
-
     injectMessage({ type: 'helmetDisconnected' })
     disableHelmetView()
   }, [injectMessage, disableHelmetView])
@@ -231,8 +240,7 @@ export default function NavigationScreen({ navigation }) {
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // Session intentionally NOT stopped — must survive screen changes
-      // UDP stays open so background location still feeds the helmet
+      // Session + UDP intentionally NOT stopped — survives screen changes
     }
   }, [])
 

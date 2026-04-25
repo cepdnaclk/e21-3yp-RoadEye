@@ -1,3 +1,13 @@
+// src/components/dashboard/DashboardHeader.js
+//
+// Changes from original:
+//   • onConnectionChange now receives the full HELMET_STATE string
+//     (e.g. 'CONNECTED', 'DISCONNECTED') — not a boolean.
+//     DashboardPage compares against HELMET_STATE.CONNECTED constant.
+//   • onHelmetData receives the parsed sensor/IMU/wear object from
+//     useHelmetConnection whenever the ESP32 sends a data packet.
+//   • Everything else (layout, dropdown, avatar) is identical.
+
 import { useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
@@ -7,8 +17,6 @@ import HelmetConnectButton from './HelmetConnectButton'
 
 const C = colors
 
-// DashboardHeader now accepts onHelmetData and onConnectionChange
-// so DashboardPage can react to live helmet data.
 export default function DashboardHeader({ onLogout, onHelmetData, onConnectionChange }) {
   const { user }   = useAuth()
   const navigation = useNavigation()
@@ -43,8 +51,6 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
           <TouchableOpacity style={styles.iconBtn}>
             <Text style={styles.iconText}>🔔</Text>
           </TouchableOpacity>
-
-          {/* Avatar — tap opens dropdown */}
           <TouchableOpacity
             onPress={() => setDropdown(true)}
             style={styles.avatar}
@@ -55,7 +61,12 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
         </View>
       </View>
 
-      {/* ── Real helmet connect button replaces the static pill ── */}
+      {/*
+        HelmetConnectButton:
+          onDataReceived    → bubbles ESP32 sensor/IMU/wear packets up to DashboardPage
+          onConnectionChange → bubbles full HELMET_STATE string up to DashboardPage
+                               (parent compares: state === HELMET_STATE.CONNECTED)
+      */}
       <HelmetConnectButton
         onDataReceived={onHelmetData}
         onConnectionChange={onConnectionChange}
@@ -71,7 +82,6 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
         <Pressable style={styles.backdrop} onPress={() => setDropdown(false)}>
           <Pressable style={styles.menu} onPress={e => e.stopPropagation()}>
 
-            {/* User info */}
             <View style={styles.menuHeader}>
               <View style={styles.menuAvatar}>
                 <Text style={styles.menuAvatarText}>{initial}</Text>
@@ -84,14 +94,12 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
 
             <View style={styles.divider} />
 
-            {/* Change Profile */}
             <TouchableOpacity style={styles.menuItem} onPress={handleProfile} activeOpacity={0.7}>
               <Text style={styles.menuItemIcon}>👤</Text>
               <Text style={styles.menuItemText}>Change Profile</Text>
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
 
-            {/* Settings */}
             <TouchableOpacity style={styles.menuItem} onPress={handleSettings} activeOpacity={0.7}>
               <Text style={styles.menuItemIcon}>⚙️</Text>
               <Text style={styles.menuItemText}>Settings</Text>
@@ -100,7 +108,6 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
 
             <View style={styles.divider} />
 
-            {/* Logout */}
             <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
               <Text style={styles.menuItemIcon}>🚪</Text>
               <Text style={[styles.menuItemText, { color: '#DC2626' }]}>Log Out</Text>
@@ -110,7 +117,6 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
           </Pressable>
         </Pressable>
       </Modal>
-
     </View>
   )
 }
@@ -126,7 +132,6 @@ const styles = StyleSheet.create({
   avatar:         { width: 36, height: 36, borderRadius: 18, backgroundColor: '#f97316', alignItems: 'center', justifyContent: 'center' },
   avatarText:     { color: '#fff', fontWeight: '800', fontSize: 14 },
 
-  // Modal
   backdrop:       { flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' },
   menu:           { position: 'absolute', top: 70, right: 16, width: 240, backgroundColor: '#fff', borderRadius: 16, shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20, elevation: 10, overflow: 'hidden' },
   menuHeader:     { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },

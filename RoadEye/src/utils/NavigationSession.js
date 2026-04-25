@@ -1,4 +1,19 @@
 // src/utils/NavigationSession.js
+//
+// Changes from original:
+//   • updateNavStep() still calls HelmetUDP.send({ type:'step', ... })
+//     which is a no-op in the binary protocol (extend PCLink.h to add
+//     PKT_NAV_STEP if you want step text on the helmet display).
+//   • stopNavSession() still calls HelmetUDP.send({ type:'clear' }) — no-op
+//     in binary protocol, harmless.
+//   • Everything else is identical to your original NavigationSession.js.
+//
+// To push weather into PKT_TELEMETRY from a WeatherCard component:
+//   import HelmetUDP from './HelmetUDP'
+//   HelmetUDP.setWeather({ tempC: 28.5, humidity: 78, pressure: 1008,
+//                          altitudeM: 10, weatherIcon: 1 })
+// HelmetUDP will merge these into every subsequent GPS telemetry packet.
+
 import { useEffect, useState } from 'react'
 import * as Location from 'expo-location'
 import * as TaskManager from 'expo-task-manager'
@@ -31,8 +46,6 @@ export const setDestinationWeatherTarget = (target) => {
 }
 
 // ── Helmet view state ─────────────────────────────────────────────────────────
-// true  = map is in dark-bg / white-roads helmet mode
-// false = normal map colours
 export const setHelmetView = (active) => {
   _state = { ..._state, helmetView: active }
   notify()
@@ -53,7 +66,8 @@ export const updateNavStep = (step) => {
   notify()
   updateNotification(step?.text, step?.dist)
 
-  // ── UDP: forward step to helmet display ──────────────────────────────────
+  // Binary protocol: PKT_NAV_STEP not defined in PCLink.h yet — send() is a
+  // no-op for type:'step'. Add it to PCLink.h + HelmetUDP.js to enable.
   if (step) {
     HelmetUDP.send({
       type:  'step',
@@ -100,9 +114,7 @@ export const useNavSession = () => {
 }
 
 // ── Background location task ──────────────────────────────────────────────────
-// Runs when the app is backgrounded during active navigation.
-// Sends GPS packets directly to the helmet via UDP so the helmet map
-// stays live even when the phone screen is off.
+// Sends PKT_TELEMETRY to the helmet even when the app is backgrounded.
 TaskManager.defineTask(NAV_TASK, ({ data, error }) => {
   if (error) { console.warn('[NavTask]', error); return }
   if (data?.locations?.length) {
@@ -110,7 +122,7 @@ TaskManager.defineTask(NAV_TASK, ({ data, error }) => {
     const kmh = speed ? Math.round(speed * 3.6) : _state.speed
     updateNavSpeed(kmh)
 
-    // ── UDP: background GPS → helmet ─────────────────────────────────────
+    // ── UDP: background GPS → PKT_TELEMETRY ──────────────────────────────
     HelmetUDP.send({
       type:    'gps',
       lat:     latitude,
