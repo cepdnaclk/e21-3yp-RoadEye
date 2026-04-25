@@ -1,220 +1,178 @@
 // src/utils/HelmetMapStreamer.js
 //
-// Captures a 120×120 map snapshot via react-native-maps takeSnapshot(),
-// pixel-diffs it against the previous frame, and only sends a new JPEG
-// over UDP (via HelmetUDP.sendJpeg) when enough pixels have changed.
+// Captures the navigation map by injecting a canvas snapshot request into
+// the existing Leaflet WebView — no react-native-maps, no native modules,
+// no CORS issues (tiles are already rendered in the page).
 //
-// No WebView canvas, no CORS issues, no backend needed.
+// How it works:
+//   1. Every 200 ms (5 fps) we inject a JS snippet into the WebView that
+//      stitches all visible Leaflet tile <img> elements + the route canvas
+//      into a 120x120 <canvas> and postMessages the result as a base64 JPEG.
+//   2. NavigationScreen receives that message in onWebViewMessage and calls
+//      HelmetMapStreamer.ingestFrame(base64).
+//   3. We decode base64 -> Uint8Array, pixel-diff against the last frame,
+//      and only call HelmetUDP.sendJpeg() when enough pixels changed.
 //
-// Usage:
-//   import HelmetMapStreamer from './HelmetMapStreamer'
-//
-//   // Pass your MapView ref once the map is ready and helmet is connected:
-//   HelmetMapStreamer.start(mapViewRef)
-//
-//   // Stop when helmet disconnects or screen unmounts:
+// Usage (see NavigationScreen.js for wiring):
+//   HelmetMapStreamer.start(injectFn)          // pass webViewRef inject wrapper
+//   HelmetMapStreamer.ingestFrame(base64Jpeg)  // call from onWebViewMessage
 //   HelmetMapStreamer.stop()
-//
-//   // Update the map center as GPS moves (streamer will capture the new view):
-//   HelmetMapStreamer.updateCamera({ latitude, longitude, heading })
 
-import { Platform } from 'react-native'
 import HelmetUDP from './HelmetUDP'
 
-// ─── Tuning ──────────────────────────────────────────────────────────────────
-const CAPTURE_SIZE     = 120     // px — matches ESP32 JPEG buffer (120×120)
-const TARGET_FPS       = 5       // max frames per second transmitted
-const JPEG_QUALITY     = 0.65    // 0..1  (~3–6 kB per frame at 120×120)
-const DIFF_THRESHOLD   = 28      // per-channel delta to count a pixel as changed
-const DIFF_MIN_PIXELS  = 150     // skip frame if fewer pixels changed than this
-const INTERCHUNK_MS    = 4       // ms gap between UDP chunks (ESP32 buffer relief)
+// Tuning
+const TARGET_FPS      = 5
+const DIFF_THRESHOLD  = 28
+const DIFF_MIN_PIXELS = 150
+const JPEG_QUALITY    = 0.65
 
-// ─── Module singleton state ───────────────────────────────────────────────────
-let _mapRef    = null   // React ref to the <MapView> component
-let _timer     = null
-let _active    = false
-let _prevPixels = null  // Uint8ClampedArray of last-sent frame RGBA
-
-// ─── Public API ───────────────────────────────────────────────────────────────
+// Singleton state
+let _inject     = null
+let _timer      = null
+let _active     = false
+let _prevPixels = null
 
 const HelmetMapStreamer = {
 
-  /**
-   * start(mapViewRef)
-   * Begin the capture → diff → send loop.
-   * Call this when the helmet connects AND the MapView is mounted.
-   */
-  start(mapViewRef) {
+  start(injectFn) {
     if (_active) return
-    if (!mapViewRef?.current) {
-      console.warn('[MapStreamer] start() called with no mapViewRef')
+    if (typeof injectFn !== 'function') {
+      console.warn('[MapStreamer] start() needs an inject function')
       return
     }
-    _mapRef     = mapViewRef
+    _inject     = injectFn
     _active     = true
     _prevPixels = null
     console.log('[MapStreamer] started')
     _scheduleNext()
   },
 
-  /**
-   * stop()
-   * Stop the loop. The ESP32 keeps showing the last received frame.
-   */
   stop() {
     _active = false
     if (_timer) { clearTimeout(_timer); _timer = null }
     _prevPixels = null
+    _inject     = null
     console.log('[MapStreamer] stopped')
   },
 
   isActive() { return _active },
+
+  async ingestFrame(base64) {
+    if (!_active || !base64) return
+    try {
+      await _processFrame(base64)
+    } catch (err) {
+      console.warn('[MapStreamer] ingestFrame error:', err?.message)
+    }
+  },
 }
 
 export default HelmetMapStreamer
 
-// ─── Capture loop ─────────────────────────────────────────────────────────────
-
 function _scheduleNext() {
   if (!_active) return
-  _timer = setTimeout(_tick, Math.round(1000 / TARGET_FPS))
+  _timer = setTimeout(_requestFrame, Math.round(1000 / TARGET_FPS))
 }
 
-async function _tick() {
-  if (!_active) return
-  try {
-    await _captureAndSend()
-  } catch (err) {
-    // Don't let a single failed frame kill the loop
-    console.warn('[MapStreamer] tick error:', err?.message ?? err)
-  }
+function _requestFrame() {
+  if (!_active || !_inject) return
+
+  const quality = JPEG_QUALITY
+
+  _inject(`
+    (function() {
+      try {
+        var mapEl = document.getElementById('map');
+        if (!mapEl) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame',b64:null}));
+          return;
+        }
+        var out = document.createElement('canvas');
+        out.width = 120; out.height = 120;
+        var ctx = out.getContext('2d');
+        ctx.fillStyle = '#e8e0d8';
+        ctx.fillRect(0, 0, 120, 120);
+        var rect = mapEl.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame',b64:null}));
+          return;
+        }
+        var sx = 120 / rect.width;
+        var sy = 120 / rect.height;
+        var tiles = mapEl.querySelectorAll('.leaflet-tile');
+        tiles.forEach(function(img) {
+          try {
+            var r = img.getBoundingClientRect();
+            ctx.drawImage(img,
+              (r.left - rect.left) * sx, (r.top - rect.top) * sy,
+              r.width * sx, r.height * sy
+            );
+          } catch(e) {}
+        });
+        var overlays = mapEl.querySelectorAll('.leaflet-overlay-pane canvas');
+        overlays.forEach(function(el) {
+          try { ctx.drawImage(el, 0, 0, 120, 120); } catch(e) {}
+        });
+        if (typeof userLat !== 'undefined' && userLat !== null && typeof map !== 'undefined') {
+          try {
+            var pt = map.latLngToContainerPoint([userLat, userLng]);
+            var px = (pt.x / rect.width) * 120;
+            var py = (pt.y / rect.height) * 120;
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#4F46E5';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.fill(); ctx.stroke();
+          } catch(e) {}
+        }
+        var dataUrl = out.toDataURL('image/jpeg', ${quality});
+        var b64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame', b64: b64}));
+      } catch(e) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame', b64:null}));
+      }
+    })(); true;
+  `)
+
   _scheduleNext()
 }
 
-async function _captureAndSend() {
-  if (!_mapRef?.current) return
+async function _processFrame(base64) {
+  const binary   = atob(base64)
+  const jpegBytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) jpegBytes[i] = binary.charCodeAt(i)
 
-  // 1. Snapshot the MapView at 120×120 — returns a local file:// URI
-  //    takeSnapshot() is built into react-native-maps, no extra install.
-  let uri
-  try {
-    uri = await _mapRef.current.takeSnapshot({
-      width:   CAPTURE_SIZE,
-      height:  CAPTURE_SIZE,
-      format:  'jpg',
-      quality: JPEG_QUALITY,
-      result:  'file',       // file URI — avoids base64 string overhead
-    })
-  } catch (err) {
-    // Map not ready yet (tiles still loading, component unmounted, etc.)
-    return
-  }
-
-  if (!uri) return
-
-  // 2. Load the snapshot as raw pixels for diffing.
-  //    We fetch the file URI and decode it.
   let pixels
   try {
-    pixels = await _uriToPixels(uri)
+    const blob   = new Blob([jpegBytes], { type: 'image/jpeg' })
+    const bitmap = await createImageBitmap(blob)
+    const oc     = new OffscreenCanvas(120, 120)
+    const ctx    = oc.getContext('2d')
+    ctx.drawImage(bitmap, 0, 0, 120, 120)
+    pixels = ctx.getImageData(0, 0, 120, 120).data
   } catch (err) {
-    console.warn('[MapStreamer] pixel decode error:', err?.message)
+    // OffscreenCanvas not available — skip diff, always send
+    HelmetUDP.sendJpeg(jpegBytes)
     return
   }
 
-  // 3. Pixel diff — count how many pixels changed significantly
   const changed = _countChangedPixels(pixels)
-  if (changed < DIFF_MIN_PIXELS) {
-    // Map is still — ESP32 holds last frame, save bandwidth
-    return
-  }
+  if (changed < DIFF_MIN_PIXELS) return
 
-  // 4. Store this frame as the new baseline
-  _prevPixels = new Uint8ClampedArray(pixels)
-
-  // 5. Re-encode as JPEG bytes (we re-fetch the same URI as arrayBuffer)
-  let jpegBytes
-  try {
-    jpegBytes = await _uriToJpegBytes(uri)
-  } catch (err) {
-    console.warn('[MapStreamer] JPEG read error:', err?.message)
-    return
-  }
-
-  // 6. Hand off to HelmetUDP — it handles chunking + headers internally
+  _prevPixels = new Uint8Array(pixels)
   HelmetUDP.sendJpeg(jpegBytes)
 }
 
-// ─── Pixel diff ───────────────────────────────────────────────────────────────
-
 function _countChangedPixels(newPixels) {
-  if (!_prevPixels || _prevPixels.length !== newPixels.length) {
-    // First frame — always send
-    return Infinity
-  }
+  if (!_prevPixels || _prevPixels.length !== newPixels.length) return Infinity
   let count = 0
   for (let i = 0; i < newPixels.length; i += 4) {
-    const dr = Math.abs(newPixels[i]     - _prevPixels[i])
-    const dg = Math.abs(newPixels[i + 1] - _prevPixels[i + 1])
-    const db = Math.abs(newPixels[i + 2] - _prevPixels[i + 2])
-    if (dr > DIFF_THRESHOLD || dg > DIFF_THRESHOLD || db > DIFF_THRESHOLD) {
-      count++
-    }
+    if (
+      Math.abs(newPixels[i]   - _prevPixels[i])   > DIFF_THRESHOLD ||
+      Math.abs(newPixels[i+1] - _prevPixels[i+1]) > DIFF_THRESHOLD ||
+      Math.abs(newPixels[i+2] - _prevPixels[i+2]) > DIFF_THRESHOLD
+    ) count++
   }
   return count
-}
-
-// ─── Image utilities ──────────────────────────────────────────────────────────
-
-/**
- * Decode a file:// URI into a flat RGBA Uint8ClampedArray using
- * the Canvas API (available in React Native via Hermes + Fabric,
- * or via the @shopify/react-native-skia / expo-image-manipulator path).
- *
- * We use expo-image-manipulator here because it's already a common
- * dependency in Expo projects and gives us reliable raw pixel access
- * without needing a native canvas module.
- */
-async function _uriToPixels(uri) {
-  // expo-image-manipulator: resize to exactly 120×120 and get base64
-  // If you're not using Expo, swap this for react-native-image-resizer
-  // or any library that returns a resized image URI / base64.
-  let ImageManipulator
-  try {
-    ImageManipulator = require('expo-image-manipulator')
-  } catch (_) {
-    // Fallback: if manipulator not available, skip diff and always send.
-    // Wasteful but functional.
-    return new Uint8ClampedArray(0)
-  }
-
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: CAPTURE_SIZE, height: CAPTURE_SIZE } }],
-    { base64: true, format: ImageManipulator.SaveFormat.JPEG }
-  )
-
-  if (!result.base64) return new Uint8ClampedArray(0)
-
-  // Decode base64 JPEG → pixel array via OffscreenCanvas (Hermes supports this)
-  const binary = atob(result.base64)
-  const bytes  = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-
-  const blob   = new Blob([bytes], { type: 'image/jpeg' })
-  const bitmap = await createImageBitmap(blob)
-  const oc     = new OffscreenCanvas(CAPTURE_SIZE, CAPTURE_SIZE)
-  const ctx    = oc.getContext('2d')
-  ctx.drawImage(bitmap, 0, 0)
-  return ctx.getImageData(0, 0, CAPTURE_SIZE, CAPTURE_SIZE).data
-}
-
-/**
- * Read a file:// URI and return its raw bytes as a Uint8Array.
- * This is what actually gets chunked and sent to the ESP32.
- */
-async function _uriToJpegBytes(uri) {
-  const response = await fetch(uri)
-  const buffer   = await response.arrayBuffer()
-  return new Uint8Array(buffer)
 }
