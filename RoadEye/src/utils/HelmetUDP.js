@@ -17,7 +17,7 @@
 //   PKT_IMU_OUT    (0x05) — raw IMU accel/gyro
 //   PKT_WEAR_OUT   (0x06) — wear state (0=ACTIVE 1=IDLE 2=SLEEPING)
 //   PKT_PONG       (0x08) — reply to ping
-
+import { Buffer } from 'buffer'
 // ── Packet type constants (must match PCLink.h) ───────────────────────────────
 const PKT_JPEG_CHUNK   = 0x01
 const PKT_AUDIO        = 0x02
@@ -37,11 +37,10 @@ const LISTEN_PORT = 4210
 // ── react-native-udp (graceful no-op if not installed) ───────────────────────
 let UdpSocket = null
 try {
-  UdpSocket = require('react-native-udp').default
+  UdpSocket = require('react-native-udp')
 } catch (_) {
   console.warn('[HelmetUDP] react-native-udp not installed — UDP disabled')
 }
-
 // ── Binary encode helpers ─────────────────────────────────────────────────────
 
 function buildHeader(pktType, frameId, chunkIdx, totalChunks, payloadLen) {
@@ -256,7 +255,7 @@ class _HelmetUDP {
       return
     }
     try {
-      const buf = Buffer.from ? Buffer.from(byteArray) : new Uint8Array(byteArray)
+      const buf = new Uint8Array(byteArray)
       console.log(`[HelmetUDP] 📤 Sending ${buf.length}B to ${this._targetIp}:${this._targetPort}  type=0x${byteArray[0]?.toString(16)}`)
       this._socket.send(
         buf, 0, buf.length,
