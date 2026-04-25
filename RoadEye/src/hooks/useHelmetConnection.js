@@ -22,7 +22,7 @@ export const HELMET_STATE = {
   ERROR:        'ERROR',
 }
 
-const DEFAULT_IP   = '192.168.1.42'   // edit to your ESP32's usual IP
+const DEFAULT_IP   = '192.168.1.100'   // edit to your ESP32's usual IP
 const CONNECT_TIMEOUT_MS = 6000        // give up if no PONG arrives in 6 s
 const PING_INTERVAL_MS   = 3000        // keepalive sent by HelmetUDP itself
 const MAX_LOG_LINES      = 60
