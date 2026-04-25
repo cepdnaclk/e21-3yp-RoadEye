@@ -1,15 +1,4 @@
 // src/pages/NavigationScreen.js
-//
-// Changes from original:
-//   • HelmetUDP.send({ type:'gps', ... }) now triggers PKT_TELEMETRY (binary)
-//     via the updated HelmetUDP.js — no changes needed here; the API is
-//     backward-compatible.
-//   • sendHelmetConnected() accepts helmetIp and wires it to HelmetUDP.setTarget().
-//   • Weather data can be pushed to HelmetUDP.setWeather() from a weather card;
-//     it is merged into every subsequent PKT_TELEMETRY automatically.
-//
-// Everything else (WebView, GPS subscription, nav session, back handler) is
-// identical to your original file.
 
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import {
@@ -17,6 +6,7 @@ import {
   Text, TouchableOpacity, Alert, AppState,
 } from 'react-native'
 import { WebView } from 'react-native-webview'
+import MapView from 'react-native-maps'           // ← NEW: hidden snapshot map
 import * as Location from 'expo-location'
 import {
   startNavSession,
@@ -28,15 +18,19 @@ import {
   setHelmetView,
 } from '../utils/NavigationSession'
 import HelmetUDP from '../utils/HelmetUDP'
+import HelmetMapStreamer from '../utils/HelmetMapStreamer'   // ← NEW
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
+  const snapshotMapRef = useRef(null)             // ← NEW: ref for hidden MapView
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
   const sessionActive = useRef(false)
   const webViewReady  = useRef(false)
 
-  const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
+  const [gpsStatus,   setGpsStatus]   = useState('Acquiring GPS…')
+  const [mapCamera,   setMapCamera]   = useState(null)  // ← NEW: tracks map center
+  const [helmetReady, setHelmetReady] = useState(false) // ← NEW: MapView mounted flag
 
   // ── Inject helper ─────────────────────────────────────────────────────────
   const injectMessage = useCallback((data) => {
@@ -56,8 +50,6 @@ export default function NavigationScreen({ navigation }) {
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
-    // Note: 'helmetViewActive' is a no-op in binary protocol (ESP32 renders its
-    // own dark theme). Kept for WebView map tile switching.
     HelmetUDP.send({ type: 'helmetViewActive', theme: 'dark' })
   }, [injectMessage])
 
@@ -89,9 +81,11 @@ export default function NavigationScreen({ navigation }) {
         // Push GPS to WebView map
         injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
 
-        // ── UDP → helmet: PKT_TELEMETRY (binary) ─────────────────────────
-        // HelmetUDP.send({ type:'gps', ... }) internally calls sendTelemetry()
-        // and merges any weather context set via HelmetUDP.setWeather().
+        // ── NEW: keep the hidden snapshot MapView centred on user position ──
+        // This is what HelmetMapStreamer captures for the ESP32 display.
+        setMapCamera({ latitude, longitude, heading: heading ?? 0 })
+
+        // UDP → helmet: PKT_TELEMETRY
         HelmetUDP.send({
           type:    'gps',
           lat:     latitude,
@@ -103,7 +97,7 @@ export default function NavigationScreen({ navigation }) {
     )
   }, [injectMessage])
 
-  // ── WebView ready — restore existing session OR start fresh GPS ───────────
+  // ── WebView ready ─────────────────────────────────────────────────────────
   const onWebViewLoad = useCallback(() => {
     webViewReady.current = true
     const existing = getNavState()
@@ -126,8 +120,6 @@ export default function NavigationScreen({ navigation }) {
           etaMin:      existing.etaMin,
         })
 
-        // Restore route info on helmet (binary protocol no-op; ESP32 map
-        // rebuilds from live PKT_TELEMETRY position packets).
         HelmetUDP.send({
           type:        'route',
           destination: existing.destination.name,
@@ -162,7 +154,6 @@ export default function NavigationScreen({ navigation }) {
           lng:  msg.destLng,
           name: msg.destination,
         })
-
         HelmetUDP.send({
           type:        'route',
           destination: msg.destination,
@@ -175,7 +166,6 @@ export default function NavigationScreen({ navigation }) {
 
       if (msg.type === 'step') {
         updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
-
         HelmetUDP.send({
           type:  'step',
           arrow: msg.arrow,
@@ -198,15 +188,20 @@ export default function NavigationScreen({ navigation }) {
   }, [])
 
   // ── Helmet connect / disconnect ───────────────────────────────────────────
-  // Call sendHelmetConnected(ip) from HelmetConnectButton's onConnectionChange
-  // callback when connectionState becomes CONNECTED.
   const sendHelmetConnected = useCallback((helmetIp) => {
     if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
+
+    // ← NEW: start streaming map frames to ESP32
+    HelmetMapStreamer.start(snapshotMapRef)
+
     injectMessage({ type: 'helmetConnected' })
     enableHelmetView()
   }, [injectMessage, enableHelmetView])
 
   const sendHelmetDisconnected = useCallback(() => {
+    // ← NEW: stop streaming
+    HelmetMapStreamer.stop()
+
     HelmetUDP.send({ type: 'clear' })
     HelmetUDP.destroy()
     injectMessage({ type: 'helmetDisconnected' })
@@ -217,12 +212,20 @@ export default function NavigationScreen({ navigation }) {
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
+        // ← NEW: pause streaming — MapView freezes in background
+        HelmetMapStreamer.stop()
+
         if (sessionActive.current) {
           locationSub.current?.remove()
           locationSub.current = null
         }
       }
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+        // ← NEW: resume streaming if helmet still connected
+        if (HelmetUDP._targetIp) {
+          HelmetMapStreamer.start(snapshotMapRef)
+        }
+
         if (sessionActive.current && !locationSub.current) {
           startGPS()
         }
@@ -240,7 +243,8 @@ export default function NavigationScreen({ navigation }) {
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // Session + UDP intentionally NOT stopped — survives screen changes
+      // ← NEW: stop streamer on unmount (UDP session survives for background nav)
+      HelmetMapStreamer.stop()
     }
   }, [])
 
@@ -255,6 +259,7 @@ export default function NavigationScreen({ navigation }) {
           {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
+              HelmetMapStreamer.stop()
               HelmetUDP.send({ type: 'clear' })
               await stopNavSession()
               sessionActive.current = false
@@ -276,6 +281,8 @@ export default function NavigationScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar hidden />
+
+      {/* ── Main navigation WebView (unchanged) ─────────────────────────── */}
       <WebView
         ref={webViewRef}
         source={mapSource}
@@ -289,11 +296,46 @@ export default function NavigationScreen({ navigation }) {
         allowUniversalAccessFromFileURLs
         mixedContentMode="always"
       />
+
+      {/* ── NEW: Hidden MapView used only for takeSnapshot() ────────────────
+           Size 120×120 exactly so snapshot doesn't need resizing.
+           Positioned off-screen so the user never sees it.
+           pitchEnabled/rotateEnabled/scrollEnabled all false — it's a
+           passive camera that follows GPS position only.              ── */}
+      {mapCamera && (
+        <MapView
+          ref={snapshotMapRef}
+          style={styles.snapshotMap}
+          mapType="standard"
+          pitchEnabled={false}
+          rotateEnabled={false}
+          scrollEnabled={false}
+          zoomEnabled={false}
+          showsUserLocation={true}
+          showsMyLocationButton={false}
+          showsCompass={false}
+          showsScale={false}
+          showsTraffic={false}
+          onMapReady={() => setHelmetReady(true)}
+          camera={{
+            center: {
+              latitude:  mapCamera.latitude,
+              longitude: mapCamera.longitude,
+            },
+            heading: mapCamera.heading,
+            pitch:   0,
+            zoom:    17,   // street-level zoom — good for turn-by-turn
+            altitude: 500, // iOS uses altitude, Android uses zoom
+          }}
+        />
+      )}
+
       {gpsStatus !== 'GPS ✓' && (
         <View style={styles.gpsBadge} pointerEvents="none">
           <Text style={styles.gpsBadgeText}>{gpsStatus}</Text>
         </View>
       )}
+
       <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
         <Text style={styles.backBtnText}>‹</Text>
       </TouchableOpacity>
@@ -308,6 +350,17 @@ const BORDER = 'rgba(0, 220, 180, 0.18)'
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0c10' },
   webview:   { flex: 1, backgroundColor: '#0a0c10' },
+
+  // ← NEW: 120×120, off-screen. Must be non-zero size or takeSnapshot fails.
+  snapshotMap: {
+    position: 'absolute',
+    width:  120,
+    height: 120,
+    top:    -200,   // above the visible area
+    left:   0,
+    opacity: 0,     // fully invisible — belt and braces
+  },
+
   gpsBadge: {
     position: 'absolute', top: 80, alignSelf: 'center',
     backgroundColor: BG, borderWidth: 1, borderColor: BORDER,
