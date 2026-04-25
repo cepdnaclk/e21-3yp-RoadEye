@@ -9,39 +9,40 @@ export const HELMET_STATE = {
   ERROR: 'error',
 }
 
-const DEFAULT_CONFIG = {
-  port: 4210,
-  reconnectAttempts: 3,
-  reconnectDelay: 2000,
-  connectionTimeout: 6000,
-  pingInterval: 3000,
+// FIX: define config outside the component so it's never recreated,
+// eliminating cfg object reference changes as a re-render trigger.
+const CFG = {
+  port:               4210,
+  reconnectAttempts:  3,
+  reconnectDelay:     2000,
+  connectionTimeout:  6000,
+  pingInterval:       3000,
 }
 
-export function useHelmetConnection(config = {}) {
-  const cfg = { ...DEFAULT_CONFIG, ...config }
-
+export function useHelmetConnection() {
   const [connectionState, setConnectionState] = useState(HELMET_STATE.DISCONNECTED)
-  const [helmetData, setHelmetData] = useState(null)
-  const [error, setError] = useState(null)
-  const [signal, setSignal] = useState(0)
-  const [log, setLog] = useState([])
-  const [helmetIp, setHelmetIp] = useState('192.168.8.184')
+  const [helmetData, setHelmetData]           = useState(null)
+  const [error, setError]                     = useState(null)
+  const [signal, setSignal]                   = useState(0)
+  const [log, setLog]                         = useState([])
+  const [helmetIp, setHelmetIp]               = useState('192.168.8.184')
 
-  const mountedRef       = useRef(true)
-  const reconnectCount   = useRef(0)
-  const connectTimeoutRef = useRef(null)
-  const reconnectTimerRef = useRef(null)
-  const pingTimerRef     = useRef(null)
-  const lastPongRef      = useRef(0)
-  const sensorRef        = useRef({})
-  const imuRef           = useRef({})
+  const mountedRef         = useRef(true)
+  const reconnectCount     = useRef(0)
+  const connectTimeoutRef  = useRef(null)
+  const reconnectTimerRef  = useRef(null)
+  const pingTimerRef       = useRef(null)
+  const lastPongRef        = useRef(0)
+  const sensorRef          = useRef({})
+  const imuRef             = useRef({})
+  const connectionStateRef = useRef(HELMET_STATE.DISCONNECTED)
+  const helmetIpRef        = useRef('192.168.8.184')
 
-  // FIX: keep a ref that always mirrors connectionState so callbacks and
-  // timers can read the current value without capturing a stale closure.
-  const connectionStateRef = useRef(connectionState)
-  useEffect(() => {
-    connectionStateRef.current = connectionState
-  }, [connectionState])
+  // Keep refs in sync — never put these in dep arrays
+  useEffect(() => { connectionStateRef.current = connectionState }, [connectionState])
+  useEffect(() => { helmetIpRef.current = helmetIp }, [helmetIp])
+
+  // ── Stable primitives (empty dep arrays — these never change) ─────────────
 
   const addLog = useCallback((msg, type = 'info') => {
     if (!mountedRef.current) return
@@ -60,24 +61,21 @@ export function useHelmetConnection(config = {}) {
 
   const markConnected = useCallback(() => {
     clearTimeout(connectTimeoutRef.current)
-    reconnectCount.current = 0
-    lastPongRef.current = Date.now()
+    reconnectCount.current  = 0
+    lastPongRef.current     = Date.now()
     setError(null)
     setSignal(4)
     setConnectionState(HELMET_STATE.CONNECTED)
   }, [])
 
-  // FIX: handleFailure is defined with useRef so it doesn't need to be in
-  // connect()'s dep array. This breaks the circular dep chain:
-  //   connect → handleFailure → connect (retry) → ...
-  // Using a ref means the latest version is always called without needing
-  // it in any dependency array.
+  // handleFailure and connect reference each other — use refs to break cycle
   const handleFailureRef = useRef(null)
+  const connectRef       = useRef(null)
 
   const disconnect = useCallback(() => {
     clearTimers()
     reconnectCount.current = 0
-    lastPongRef.current = 0
+    lastPongRef.current    = 0
     HelmetUDP.destroy()
     setSignal(0)
     setHelmetData(null)
@@ -85,10 +83,8 @@ export function useHelmetConnection(config = {}) {
     addLog('Disconnected', 'info')
   }, [addLog, clearTimers])
 
-  // FIX: startPing no longer depends on connectionState directly.
-  // Instead it reads connectionStateRef.current inside the interval callback
-  // so it always sees the latest value without being recreated on every
-  // state change (which was resetting the interval repeatedly).
+  // FIX: startPing has NO state or callback deps — reads everything via refs.
+  // This means it is created ONCE and never causes connect() to be recreated.
   const startPing = useCallback((ip) => {
     clearInterval(pingTimerRef.current)
     HelmetUDP.send({ type: 'ping' })
@@ -96,24 +92,19 @@ export function useHelmetConnection(config = {}) {
     pingTimerRef.current = setInterval(() => {
       HelmetUDP.send({ type: 'ping' })
 
-      // Read current state via ref — avoids stale closure
       if (
         connectionStateRef.current === HELMET_STATE.CONNECTED &&
         lastPongRef.current &&
-        Date.now() - lastPongRef.current > cfg.connectionTimeout * 2
+        Date.now() - lastPongRef.current > CFG.connectionTimeout * 2
       ) {
-        addLog('Helmet timeout: no PONG received', 'error')
         handleFailureRef.current?.(ip)
       }
-    }, cfg.pingInterval)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addLog, cfg.connectionTimeout, cfg.pingInterval])
-  // NOTE: connectionState intentionally removed from deps — we use the ref.
+    }, CFG.pingInterval)
+  }, []) // ← truly empty — all values read via refs or module-level CFG
 
-  // FIX: connect is defined with useCallback but startPing is now stable
-  // (no longer depends on connectionState), so this dep array is stable too.
+  // FIX: connect is now stable — all volatile values read via refs.
   const connect = useCallback((ip) => {
-    const targetIp = (ip || helmetIp || '').trim()
+    const targetIp = (ip || helmetIpRef.current || '').trim()
     if (!targetIp) return
 
     clearTimers()
@@ -124,7 +115,7 @@ export function useHelmetConnection(config = {}) {
     setLog([])
     setSignal(0)
     setConnectionState(HELMET_STATE.CONNECTING)
-    addLog(`Opening UDP link to ${targetIp}:${cfg.port}`, 'info')
+    addLog(`Opening UDP link to ${targetIp}:${CFG.port}`, 'info')
 
     HelmetUDP.onPong = () => {
       addLog('PONG received. Helmet connected.', 'success')
@@ -136,9 +127,7 @@ export function useHelmetConnection(config = {}) {
       publishData({
         ...sensorRef.current,
         ...imuRef.current,
-        speed: sensor.forwardAccel
-          ? Math.abs(sensor.forwardAccel * 10).toFixed(1)
-          : 0,
+        speed:          sensor.forwardAccel ? Math.abs(sensor.forwardAccel * 10).toFixed(1) : 0,
         accel:          sensor.forwardAccel,
         stability:      Math.max(0, Math.min(100, Math.round(100 - Math.abs(sensor.roll || 0)))),
         brakingCount:   sensor.forwardAccel < -0.6 ? 1 : 0,
@@ -146,7 +135,6 @@ export function useHelmetConnection(config = {}) {
         sharpTurnCount: Math.abs(sensor.roll || 0) > 35 ? 1 : 0,
         batteryLevel:   100,
       })
-      // FIX: read via ref so this callback never uses a stale state value
       if (connectionStateRef.current !== HELMET_STATE.CONNECTED) markConnected()
     }
 
@@ -161,7 +149,7 @@ export function useHelmetConnection(config = {}) {
       if (connectionStateRef.current !== HELMET_STATE.CONNECTED) markConnected()
     }
 
-    HelmetUDP.setTarget(targetIp, cfg.port)
+    HelmetUDP.setTarget(targetIp, CFG.port)
     startPing(targetIp)
 
     connectTimeoutRef.current = setTimeout(() => {
@@ -169,33 +157,35 @@ export function useHelmetConnection(config = {}) {
         addLog('Connection timeout: no UDP reply from helmet', 'error')
         handleFailureRef.current?.(targetIp)
       }
-    }, cfg.connectionTimeout)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [helmetIp, cfg.port, cfg.connectionTimeout, addLog, clearTimers, markConnected, publishData, startPing])
+    }, CFG.connectionTimeout)
+  }, [addLog, clearTimers, markConnected, publishData, startPing])
+  // helmetIp removed from deps — read via helmetIpRef instead
 
-  // FIX: assign handleFailure to the ref AFTER connect is defined so the
-  // retry inside handleFailure can call the latest connect without creating
-  // a circular dependency in the dep arrays.
+  // Keep connectRef current so handleFailure can call latest connect
+  useEffect(() => { connectRef.current = connect }, [connect])
+
+  // handleFailure lives in a ref — never in any dep array
   useEffect(() => {
     handleFailureRef.current = (ip) => {
       clearTimers()
       setSignal(0)
 
-      if (reconnectCount.current < cfg.reconnectAttempts) {
+      if (reconnectCount.current < CFG.reconnectAttempts) {
         reconnectCount.current += 1
         setConnectionState(HELMET_STATE.SCANNING)
-        addLog(`Retry ${reconnectCount.current}/${cfg.reconnectAttempts} in ${cfg.reconnectDelay / 1000}s`, 'info')
-        reconnectTimerRef.current = setTimeout(() => connect(ip), cfg.reconnectDelay)
+        addLog(`Retry ${reconnectCount.current}/${CFG.reconnectAttempts} in ${CFG.reconnectDelay / 1000}s`, 'info')
+        reconnectTimerRef.current = setTimeout(() => connectRef.current?.(ip), CFG.reconnectDelay)
         return
       }
 
       reconnectCount.current = 0
       HelmetUDP.destroy()
       setConnectionState(HELMET_STATE.ERROR)
-      setError(`Could not reach helmet at ${ip}:4210. Check same WiFi/hotspot and ESP32 IP.`)
+      setError(`Could not reach helmet at ${ip}:${CFG.port}. Check same WiFi and ESP32 IP.`)
       addLog('Max retries reached. Check helmet WiFi and IP.', 'error')
     }
-  }, [addLog, clearTimers, cfg.reconnectAttempts, cfg.reconnectDelay, connect])
+  }, [addLog, clearTimers])
+  // connect removed from deps — called via connectRef instead
 
   const sendCommand = useCallback((cmd, payload = {}) => {
     if (connectionStateRef.current !== HELMET_STATE.CONNECTED) return false
