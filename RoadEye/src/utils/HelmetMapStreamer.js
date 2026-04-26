@@ -1,40 +1,22 @@
 // src/utils/HelmetMapStreamer.js
-//
-// Captures the navigation map by injecting a canvas snapshot request into
-// the existing Leaflet WebView — no react-native-maps, no native modules,
-// no CORS issues (tiles are already rendered in the page).
-//
-// How it works:
-//   1. Every 125ms (8 fps) we inject a JS snippet into the WebView that
-//      stitches all visible Leaflet tile <img> elements + the route canvas
-//      into a 240x240 <canvas> and postMessages the result as a base64 JPEG.
-//   2. NavigationScreen receives that message in onWebViewMessage and calls
-//      HelmetMapStreamer.ingestFrame(base64).
-//   3. We decode base64 -> Uint8Array, pixel-diff against the last frame,
-//      and only call HelmetUDP.sendJpeg() when enough pixels changed.
-//
-// Usage (see NavigationScreen.js for wiring):
-//   HelmetMapStreamer.start(injectFn)          // pass webViewRef inject wrapper
-//   HelmetMapStreamer.ingestFrame(base64Jpeg)  // call from onWebViewMessage
-//   HelmetMapStreamer.stop()
 
 import HelmetUDP from './HelmetUDP'
 
 // ─── Tuning ──────────────────────────────────────────────────────────────────
-const TARGET_FPS      = 8      // 125ms interval — safe for WiFi UDP budget
-const DIFF_THRESHOLD  = 25     // per-channel delta to count a pixel as changed
-const DIFF_MIN_PIXELS = 100    // min changed pixels before we send a frame
-const JPEG_QUALITY    = 0.72   // 0.0–1.0 — 0.72 is sharp but not heavy
+const TARGET_FPS      = 5      // 200ms interval — gives JPEGDEC time to decode
+const DIFF_THRESHOLD  = 20     // per-channel delta to count a pixel as changed
+const DIFF_MIN_PIXELS = 80     // min changed pixels before sending a frame
+const JPEG_QUALITY    = 0.92   // near-lossless — eliminate blocking artifacts
 const MAP_W           = 120    // must match SecondDisplay MAP_W
 const MAP_H           = 120    // must match SecondDisplay MAP_H
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Singleton state
 let _inject     = null
 let _timer      = null
 let _active     = false
+let _paused     = false
 let _prevPixels = null
-let _waiting    = false   // prevent pile-up if WebView is slow to respond
+let _waiting    = false
 
 const HelmetMapStreamer = {
 
@@ -46,14 +28,39 @@ const HelmetMapStreamer = {
     }
     _inject     = injectFn
     _active     = true
+    _paused     = false
     _prevPixels = null
     _waiting    = false
     console.log('[MapStreamer] started')
     _scheduleNext()
   },
 
+  pause() {
+    if (!_active) return
+    _paused = true
+    console.log('[MapStreamer] paused')
+  },
+
+  resume(injectFn) {
+    if (!_active) return
+    if (typeof injectFn === 'function') _inject = injectFn
+    _paused  = false
+    _waiting = false
+    console.log('[MapStreamer] resumed')
+  },
+
+  updateInject(injectFn) {
+    if (typeof injectFn === 'function') {
+      _inject  = injectFn
+      _paused  = false
+      _waiting = false
+      console.log('[MapStreamer] inject reference updated')
+    }
+  },
+
   stop() {
     _active  = false
+    _paused  = false
     _waiting = false
     if (_timer) { clearTimeout(_timer); _timer = null }
     _prevPixels = null
@@ -84,21 +91,16 @@ function _scheduleNext() {
 }
 
 function _requestFrame() {
-  if (!_active || !_inject) return
-
-  // If the WebView hasn't replied yet, skip this tick to avoid pile-up
-  if (_waiting) {
-    _scheduleNext()
-    return
-  }
+  if (!_active) return
+  if (_paused || !_inject) { _scheduleNext(); return }
+  if (_waiting)             { _scheduleNext(); return }
 
   _waiting = true
   const quality = JPEG_QUALITY
   const mapW    = MAP_W
   const mapH    = MAP_H
 
-  // Safety timeout — unblock if WebView never replies (e.g. page reloading)
-  setTimeout(() => { _waiting = false }, 1000)
+  setTimeout(() => { _waiting = false }, 1500)
 
   _inject(`
     (function() {
@@ -114,9 +116,6 @@ function _requestFrame() {
         out.height = ${mapH};
         var ctx = out.getContext('2d');
 
-        ctx.fillStyle = '#e8e0d8';
-        ctx.fillRect(0, 0, ${mapW}, ${mapH});
-
         var rect = mapEl.getBoundingClientRect();
         if (rect.width === 0 || rect.height === 0) {
           window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame',b64:null}));
@@ -126,7 +125,12 @@ function _requestFrame() {
         var sx = ${mapW} / rect.width;
         var sy = ${mapH} / rect.height;
 
-        // Draw all Leaflet tile images
+        // ── 1. Black background ───────────────────────────────────────────
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, ${mapW}, ${mapH});
+
+        // ── 2. Dark map tiles at full opacity ─────────────────────────────
+        // CartoCDN dark_all tiles already have black background + grey roads
         var tiles = mapEl.querySelectorAll('.leaflet-tile');
         tiles.forEach(function(img) {
           try {
@@ -138,47 +142,83 @@ function _requestFrame() {
           } catch(e) {}
         });
 
-        // Draw route line canvas overlays
-        var overlays = mapEl.querySelectorAll('.leaflet-overlay-pane canvas');
-        overlays.forEach(function(el) {
-          try { ctx.drawImage(el, 0, 0, ${mapW}, ${mapH}); } catch(e) {}
-        });
-
-        // Draw SVG overlays (route polyline drawn by Leaflet as SVG)
+        // ── 3. Route line — drawn SYNCHRONOUSLY from SVG path data ───────
+        // The async blob/Image approach misses the frame because toDataURL()
+        // runs before img.onload fires. Instead we read the SVG <path>
+        // elements directly and replay them onto the canvas with Path2D.
         var svgOverlays = mapEl.querySelectorAll('.leaflet-overlay-pane svg');
         svgOverlays.forEach(function(svgEl) {
           try {
-            var s = new XMLSerializer().serializeToString(svgEl);
-            var blob = new Blob([s], {type:'image/svg+xml'});
-            var url  = URL.createObjectURL(blob);
-            var img  = new Image();
-            img.onload = function() {
-              ctx.drawImage(img, 0, 0, ${mapW}, ${mapH});
-              URL.revokeObjectURL(url);
-            };
-            img.src = url;
+            var svgW = parseFloat(svgEl.getAttribute('width'))  || svgEl.getBoundingClientRect().width;
+            var svgH = parseFloat(svgEl.getAttribute('height')) || svgEl.getBoundingClientRect().height;
+            var svgR = svgEl.getBoundingClientRect();
+
+            // Offset of SVG origin relative to map div, scaled to canvas px
+            var ox = (svgR.left - rect.left) * sx;
+            var oy = (svgR.top  - rect.top)  * sy;
+
+            // How much to scale SVG internal coords to canvas coords
+            var kx = (${mapW} / rect.width)  * (svgR.width  / svgW);
+            var ky = (${mapH} / rect.height) * (svgR.height / svgH);
+
+            var paths = svgEl.querySelectorAll('path');
+            paths.forEach(function(pathEl) {
+              var d = pathEl.getAttribute('d');
+              if (!d || d.length < 4) return;
+
+              // Skip filled shapes (destination pin circles etc.)
+              var fill = pathEl.getAttribute('fill') || '';
+              if (fill && fill !== 'none') return;
+
+              try {
+                var p2d = new Path2D(d);
+                ctx.save();
+                ctx.translate(ox, oy);
+                ctx.scale(kx, ky);
+                // White route line, thick enough to be visible at 120px
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth   = 4 / Math.min(kx, ky);
+                ctx.lineCap     = 'round';
+                ctx.lineJoin    = 'round';
+                ctx.globalAlpha = 1.0;
+                ctx.stroke(p2d);
+                ctx.restore();
+              } catch(pe) {}
+            });
           } catch(e) {}
         });
 
-        // Draw user position dot
+        // Fallback: canvas renderer (some Leaflet configs use this)
+        var canvasOverlays = mapEl.querySelectorAll('.leaflet-overlay-pane canvas');
+        canvasOverlays.forEach(function(el) {
+          try {
+            ctx.save();
+            ctx.globalCompositeOperation = 'screen';
+            ctx.drawImage(el, 0, 0, ${mapW}, ${mapH});
+            ctx.restore();
+          } catch(e) {}
+        });
+
+        // ── 4. User position dot — bright cyan ────────────────────────────
         if (typeof userLat !== 'undefined' && userLat !== null && typeof map !== 'undefined') {
           try {
             var pt = map.latLngToContainerPoint([userLat, userLng]);
             var px = (pt.x / rect.width)  * ${mapW};
             var py = (pt.y / rect.height) * ${mapH};
 
-            // Accuracy ring
+            // Glow ring
             ctx.beginPath();
-            ctx.arc(px, py, 10, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(79, 70, 229, 0.15)';
-            ctx.fill();
+            ctx.arc(px, py, 8, 0, Math.PI * 2);
+            ctx.strokeStyle = 'rgba(0, 255, 200, 0.35)';
+            ctx.lineWidth   = 3;
+            ctx.stroke();
 
-            // Position dot
+            // Solid dot
             ctx.beginPath();
-            ctx.arc(px, py, 7, 0, Math.PI * 2);
-            ctx.fillStyle   = '#4F46E5';
+            ctx.arc(px, py, 4, 0, Math.PI * 2);
+            ctx.fillStyle   = '#00ffc8';
             ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth   = 2.5;
+            ctx.lineWidth   = 1.5;
             ctx.fill();
             ctx.stroke();
           } catch(e) {}
@@ -210,15 +250,13 @@ async function _processFrame(base64) {
     ctx.drawImage(bitmap, 0, 0, MAP_W, MAP_H)
     pixels = ctx.getImageData(0, 0, MAP_W, MAP_H).data
   } catch (err) {
-    // OffscreenCanvas not available — skip diff, always send
     console.log('[MapStreamer] no OffscreenCanvas, sending raw frame')
     HelmetUDP.sendJpeg(jpegBytes)
     return
   }
 
   const changed = _countChangedPixels(pixels)
-  console.log(`[MapStreamer] changed pixels: ${changed} / ${MAP_W * MAP_H}`)
-
+  console.log(`[MapStreamer] changed: ${changed} / ${MAP_W * MAP_H}`)
   if (changed < DIFF_MIN_PIXELS) return
 
   _prevPixels = new Uint8Array(pixels)
