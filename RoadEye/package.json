@@ -13,6 +13,7 @@
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "@react-navigation/stack": "^7.8.10",
+    "audio-decode": "^3.10.1",
     "buffer": "^6.0.3",
     "expo": "~51.0.0",
     "expo-av": "~14.0.7",
