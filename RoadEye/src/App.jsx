@@ -1,17 +1,40 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { ActivityIndicator, View } from 'react-native'
+import { useRef, useEffect } from 'react'
+import * as Notifications from 'expo-notifications'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import LoginPage        from './pages/LoginPage'
 import SignupPage       from './pages/SignupPage'
 import DashboardPage    from './pages/DashboardPage'
 import EmergencyPage    from './pages/EmergencyPage'
 import NavigationScreen from './pages/NavigationScreen'
+import { requestNotificationPermission } from './utils/pushNotifications'
 
 const Stack = createNativeStackNavigator()
 
 function RootNavigator() {
   const { isLoggedIn, isLoading } = useAuth()
+  const emergencyActionRef = useRef(null)
+
+  // Ask for notification permission once after login — no Firebase, no token
+  useEffect(() => {
+    if (isLoggedIn) {
+      requestNotificationPermission()
+    }
+  }, [isLoggedIn])
+
+  // Listen for the local notification and trigger SMS
+  useEffect(() => {
+    const subscription = Notifications.addNotificationReceivedListener(notification => {
+      const data = notification.request.content.data
+      if (data?.triggered) {
+        console.log('[Notification] Tilt alert received — triggering SMS')
+        emergencyActionRef.current?.()
+      }
+    })
+    return () => subscription.remove()
+  }, [])
 
   if (isLoading) {
     return (
@@ -24,12 +47,19 @@ function RootNavigator() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      detachInactiveScreens={false}   // ← keeps NavigationScreen (WebView) alive when you go back to Dashboard
+      detachInactiveScreens={false}
     >
       {isLoggedIn ? (
         <>
-          <Stack.Screen name="Dashboard"  component={DashboardPage} />
-          <Stack.Screen name="Emergency"  component={EmergencyPage} />
+          <Stack.Screen name="Dashboard" component={DashboardPage} />
+          <Stack.Screen name="Emergency">
+            {props => (
+              <EmergencyPage
+                {...props}
+                onRegisterAction={(fn) => { emergencyActionRef.current = fn }}
+              />
+            )}
+          </Stack.Screen>
           <Stack.Screen name="Navigation" component={NavigationScreen} />
         </>
       ) : (

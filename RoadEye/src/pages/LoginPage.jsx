@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { View, StyleSheet } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import LoginForm from '../components/login/LoginForm'
@@ -14,12 +13,17 @@ const BASE_URL = 'http://10.30.1.169:8080'
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
-  const { login }   = useAuth()
-  const navigation  = useNavigation()
+  const { login }  = useAuth()
+  const navigation = useNavigation()
 
-  const [showPerms,   setShowPerms]   = useState(false)
-  const [loginError,  setLoginError]  = useState('')
-  const [loading,     setLoading]     = useState(false)
+  const [showPerms,  setShowPerms]  = useState(false)
+  const [loginError, setLoginError] = useState('')
+  const [loading,    setLoading]    = useState(false)
+
+  // Temporarily hold token + user between handleLogin and handlePermissionsComplete
+  // so we can pass them to login() only after the permissions modal is done
+  const [pendingToken, setPendingToken] = useState(null)
+  const [pendingUser,  setPendingUser]  = useState(null)
 
   const handleLogin = async ({ email, password }) => {
     // ── Validation ──────────────────────────────────────────────────────────
@@ -42,20 +46,19 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (!response.ok) {
-        // Backend returns { "error": "..." } on failure (wrong password, not found)
         throw new Error(data.error || 'Login failed')
       }
 
       // ✅ Backend returns { token: "...", user: { id, email, firstName, ... } }
       const { token, user } = data
 
-      // Save JWT so all future API calls can attach it as Bearer token
-      await AsyncStorage.setItem('jwt_token', token)
-      await AsyncStorage.setItem('user', JSON.stringify(user))
-
       console.log('Login success, user:', user)
 
-      // Show permissions modal before entering app
+      // Hold token + user until permissions are accepted, then pass to login()
+      // login() now handles saving to AsyncStorage — no need to do it here
+      setPendingToken(token)
+      setPendingUser(user)
+
       setShowPerms(true)
 
     } catch (err) {
@@ -70,8 +73,8 @@ export default function LoginPage() {
   }
 
   const handlePermissionsComplete = () => {
-    // ✅ Only called after real login + token saved
-    login()
+    // ✅ Pass token + user to login() — it saves to AsyncStorage and sets state
+    login(pendingToken, pendingUser)
   }
 
   return (
@@ -79,8 +82,8 @@ export default function LoginPage() {
       <LoginForm
         onLogin={handleLogin}
         onNavigateSignup={() => navigation.navigate('Signup')}
-        error={loginError}      // pass down so LoginForm can show it
-        loading={loading}       // pass down so LoginForm can disable button
+        error={loginError}
+        loading={loading}
       />
       <PermissionModal
         visible={showPerms}

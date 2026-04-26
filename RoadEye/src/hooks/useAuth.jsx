@@ -5,40 +5,70 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isLoading,  setIsLoading]  = useState(true)  // ← App.jsx needs this
+  const [isLoading,  setIsLoading]  = useState(true)
+  const [userId,     setUserId]     = useState(null)
+  const [token,      setToken]      = useState(null)
 
-  // Check for existing token when app starts
-  // This keeps the user logged in after closing and reopening the app
   useEffect(() => {
     const checkToken = async () => {
       try {
-        const token = await AsyncStorage.getItem('jwt_token')
-        setIsLoggedIn(!!token)
+        const [storedToken, storedUser] = await Promise.all([
+          AsyncStorage.getItem('jwt_token'),
+          AsyncStorage.getItem('user'),
+        ])
+
+        if (storedToken) {
+          setToken(storedToken)
+          setIsLoggedIn(true)
+
+          // Pull userId from stored user object if available
+          if (storedUser) {
+            const parsed = JSON.parse(storedUser)
+            setUserId(parsed.id ?? parsed.userId ?? null)
+          }
+        }
       } catch (e) {
+        console.error('[Auth] checkToken error:', e)
         setIsLoggedIn(false)
       } finally {
-        setIsLoading(false)  // ← hides the orange spinner in App.jsx
+        setIsLoading(false)
       }
     }
     checkToken()
   }, [])
 
-  const login = () => {
-    setIsLoggedIn(true)   // flip flag → App.jsx swaps to Dashboard automatically
+  // Call this after a successful login API response
+  // Pass the JWT string and the user object from your backend
+  const login = async (jwtToken, userObject) => {
+    try {
+      await Promise.all([
+        AsyncStorage.setItem('jwt_token', jwtToken),
+        AsyncStorage.setItem('user', JSON.stringify(userObject)),
+      ])
+    } catch (e) {
+      console.error('[Auth] login save error:', e)
+    }
+    setToken(jwtToken)
+    setUserId(userObject.id ?? userObject.userId ?? null)
+    setIsLoggedIn(true)
   }
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('jwt_token')
-      await AsyncStorage.removeItem('user')
+      await Promise.all([
+        AsyncStorage.removeItem('jwt_token'),
+        AsyncStorage.removeItem('user'),
+      ])
     } catch (e) {
-      console.log('Logout error:', e)
+      console.error('[Auth] logout error:', e)
     }
-    setIsLoggedIn(false)  // flip flag → App.jsx swaps to Login automatically
+    setToken(null)
+    setUserId(null)
+    setIsLoggedIn(false)
   }
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, isLoading, userId, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -11,7 +11,7 @@ import { colors } from '../utils/theme'
 
 const C = colors
 
-// ─── Use @ prefix — AsyncStorage best practice ────────────────────────────
+// ─── AsyncStorage keys ────────────────────────────────────────────────────
 const KEY_CONTACTS = '@emergency_contacts'
 const KEY_MESSAGE  = '@emergency_custom_message'
 
@@ -44,7 +44,7 @@ const remove = async (key) => {
   }
 }
 
-// ─── Timeout wrapper — prevents getContactsAsync hanging forever ──────────
+// ─── Timeout wrapper ──────────────────────────────────────────────────────
 const withTimeout = (promise, ms = 10000) =>
   Promise.race([
     promise,
@@ -65,9 +65,10 @@ export const requestContactsPermissionOnLogin = async () => {
 
 const avatarColors = ['#4F46E5', '#7C3AED', '#2563EB', '#059669', '#DC2626']
 
-export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) {
+// ─── CHANGE 1: Added onRegisterAction prop ────────────────────────────────
+export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', onRegisterAction }) {
   const insets = useSafeAreaInsets()
-  const isLoadingContactsRef = useRef(false)   // guard against double-tap
+  const isLoadingContactsRef = useRef(false)
 
   // ── Core state ────────────────────────────────────────────────────────────
   const [emergencyContacts, setEmergencyContacts] = useState([])
@@ -101,8 +102,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
   const [messageError,     setMessageError]     = useState('')
   const activeMessage = savedMessage || defaultMessage
 
-  // ── Init: load persisted data only — no permission request here ──────────
-  // Permission is only asked when the user actively taps "Add Contact"
+  // ── Init: load persisted data ─────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       console.log('[Init] Loading persisted emergency data...')
@@ -128,9 +128,17 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     init()
   }, [])
 
+  // ── CHANGE 2: Expose handleTestSend to App.jsx via onRegisterAction ───────
+  // This allows App.jsx to call handleTestSend() when a push notification
+  // arrives with data.triggered === true (tilt exceeded 21°)
+  useEffect(() => {
+    if (onRegisterAction) {
+      onRegisterAction(() => handleTestSend)
+    }
+  }, [onRegisterAction])
+
   // ── Open contact picker ───────────────────────────────────────────────────
   const loadContacts = async () => {
-    // Guard: prevent double-tap or re-entry
     if (isLoadingContactsRef.current) return
     if (emergencyContacts.length >= 5) {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
@@ -142,13 +150,11 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     console.log('[Contacts] loadContacts called')
 
     try {
-      // Step 1: Check current permission status first (no dialog yet)
       const { status: existingStatus } = await Contacts.getPermissionsAsync()
       console.log('[Contacts] existing permission status:', existingStatus)
 
       let finalStatus = existingStatus
 
-      // Step 2: Only request if not already determined
       if (existingStatus !== 'granted' && existingStatus !== 'denied') {
         const { status: requested } = await Contacts.requestPermissionsAsync()
         console.log('[Contacts] requested permission status:', requested)
@@ -156,7 +162,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
       }
 
       if (finalStatus !== 'granted') {
-        // On 'denied', canAskAgain will be false on iOS after first deny
         const { canAskAgain } = await Contacts.getPermissionsAsync()
         Alert.alert(
           canAskAgain ? 'Permission Required' : 'Permission Blocked',
@@ -173,7 +178,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
 
       console.log('[Contacts] Permission granted — fetching contacts...')
 
-      // Step 3: Fetch with a 10-second timeout to prevent hanging
       let data = []
       try {
         const result = await withTimeout(
@@ -182,7 +186,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
               Contacts.Fields.Name,
               Contacts.Fields.PhoneNumbers,
             ],
-            // sort helps on Android
             sort: Contacts.SortTypes.FirstName,
           }),
           10000
@@ -204,7 +207,6 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
         return
       }
 
-      // Step 4: Filter to only contacts that have a name AND at least one phone number
       const filtered = data
         .filter(c => c.name?.trim() && c.phoneNumbers?.length > 0)
         .map((c, i) => ({
@@ -237,7 +239,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     }
   }
 
-  // ── Add contact — optimistic update, persist in background ───────────────
+  // ── Add contact ───────────────────────────────────────────────────────────
   const handleSelectContact = async (contact) => {
     if (emergencyContacts.length >= 5) {
       Alert.alert('Limit Reached', 'You can add up to 5 emergency contacts.')
@@ -259,14 +261,12 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     }
     const updated = [...emergencyContacts, newContact]
 
-    // Optimistic: update UI immediately, then persist
     setEmergencyContacts(updated)
     setShowPicker(false)
     setSearchQuery('')
 
     const saved = await save(KEY_CONTACTS, updated)
     if (!saved) {
-      // Rollback if save failed
       setEmergencyContacts(emergencyContacts)
       Alert.alert('Save Failed', 'Could not save this contact. Please try again.')
     }
@@ -278,7 +278,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     setShowContactDetail(true)
   }
 
-  // ── Remove contact — optimistic update, persist in background ────────────
+  // ── Remove contact ────────────────────────────────────────────────────────
   const handleRemoveContact = (id) => {
     Alert.alert('Remove Contact', 'Remove this emergency contact?', [
       { text: 'Cancel', style: 'cancel' },
@@ -289,13 +289,11 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
           const updated = emergencyContacts.filter(c => c.id !== id)
           const prev = emergencyContacts
 
-          // Optimistic: update UI immediately
           setEmergencyContacts(updated)
           setShowContactDetail(false)
 
           const saved = await save(KEY_CONTACTS, updated)
           if (!saved) {
-            // Rollback
             setEmergencyContacts(prev)
             Alert.alert('Error', 'Could not remove contact. Please try again.')
           }
@@ -312,11 +310,11 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
     }
     setMessageError('')
     const msg = customMessage.trim()
-    setSavedMessage(msg)           // optimistic
+    setSavedMessage(msg)
     setIsEditingMessage(false)
     const saved = await save(KEY_MESSAGE, msg)
     if (!saved) {
-      setSavedMessage(savedMessage) // rollback
+      setSavedMessage(savedMessage)
       Alert.alert('Save Failed', 'Could not save your message. Please try again.')
     } else {
       Alert.alert('Saved!', 'Your custom emergency message has been saved.')
@@ -332,6 +330,8 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H' }) 
   }
 
   // ── Send emergency SMS ────────────────────────────────────────────────────
+  // NOTE: This function is also called automatically by App.jsx when a push
+  // notification arrives with data.triggered === true (tilt exceeded 21°)
   const handleTestSend = async () => {
     const contactsWithPhone = emergencyContacts.filter(c => c.phone?.trim())
     if (emergencyContacts.length === 0) {
