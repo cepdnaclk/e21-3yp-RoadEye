@@ -23,7 +23,7 @@ if (!HelmetUDP.sendAudio) {
   }.bind(HelmetUDP)
 }
 
-const ESP32_URL  = `http://192.168.137.10/track`
+const ESP32_URL  = `http://192.168.137.210/track`
 const CHUNK_SIZE = 240
 
 export default function MusicPlayer() {

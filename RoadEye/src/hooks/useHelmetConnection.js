@@ -25,7 +25,7 @@ export function useHelmetConnection() {
   const [error, setError]                     = useState(null)
   const [signal, setSignal]                   = useState(0)
   const [log, setLog]                         = useState([])
-  const [helmetIp, setHelmetIp]               = useState('192.168.137.10')
+  const [helmetIp, setHelmetIp]               = useState('192.168.137.210')
 
   const mountedRef         = useRef(true)
   const reconnectCount     = useRef(0)
