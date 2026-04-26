@@ -19,7 +19,7 @@ import {
 import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 
-const ESP32_IP = '192.168.137.233'
+const ESP32_IP = '192.168.137.10'
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
