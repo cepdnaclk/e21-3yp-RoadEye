@@ -1,6 +1,6 @@
 // src/pages/NavigationScreen.js
 // Full file — drop this into src/pages/ replacing your existing one.
-// Changes from your original are marked with  // ← NEW  comments.
+// Changes from previous version are marked with  // ← NEW  comments.
 
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import {
@@ -19,7 +19,13 @@ import {
   setHelmetView,
 } from '../utils/NavigationSession'
 import HelmetUDP from '../utils/HelmetUDP'
-import HelmetMapStreamer from '../utils/HelmetMapStreamer'   // ← NEW
+import HelmetMapStreamer from '../utils/HelmetMapStreamer'
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  ← NEW: Put your ESP32's IP here (printed in Serial Monitor on boot)
+//         e.g. '192.168.1.105'  or  '192.168.4.1' if you're using AP mode
+// ─────────────────────────────────────────────────────────────────────────────
+const ESP32_IP = '192.168.137.233'   // ← CHANGE THIS
 
 export default function NavigationScreen({ navigation }) {
   const webViewRef    = useRef(null)
@@ -28,9 +34,10 @@ export default function NavigationScreen({ navigation }) {
   const sessionActive = useRef(false)
   const webViewReady  = useRef(false)
 
-  const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
+  const [gpsStatus,       setGpsStatus]       = useState('Acquiring GPS…')
+  const [helmetConnected, setHelmetConnected] = useState(false) // ← NEW
 
-  // ── Inject helper (unchanged) ─────────────────────────────────────────────
+  // ── Inject helper ─────────────────────────────────────────────────────────
   const injectMessage = useCallback((data) => {
     if (!webViewReady.current) return
     const script = `
@@ -44,14 +51,13 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(script)
   }, [])
 
-  // ← NEW: raw JS injector used by the streamer (bypasses the dispatchEvent
-  //        wrapper so the injected code runs directly, not as a message event)
+  // Raw JS injector used by the streamer
   const injectJS = useCallback((jsString) => {
     if (!webViewReady.current) return
     webViewRef.current?.injectJavaScript(jsString)
   }, [])
 
-  // ── Helmet view helpers (unchanged) ──────────────────────────────────────
+  // ── Helmet view helpers ───────────────────────────────────────────────────
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
@@ -64,7 +70,7 @@ export default function NavigationScreen({ navigation }) {
     HelmetUDP.send({ type: 'helmetViewActive', theme: 'normal' })
   }, [injectMessage])
 
-  // ── GPS (unchanged) ───────────────────────────────────────────────────────
+  // ── GPS ───────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
     if (status !== 'granted') {
@@ -94,7 +100,7 @@ export default function NavigationScreen({ navigation }) {
     )
   }, [injectMessage])
 
-  // ── WebView ready (unchanged) ─────────────────────────────────────────────
+  // ── WebView ready ─────────────────────────────────────────────────────────
   const onWebViewLoad = useCallback(() => {
     webViewReady.current = true
     const existing = getNavState()
@@ -135,10 +141,10 @@ export default function NavigationScreen({ navigation }) {
     try {
       const msg = JSON.parse(event.nativeEvent.data)
 
-      // ← NEW: map frame from the streamer's injected canvas snippet
+      // Map frame from the streamer's injected canvas snippet
       if (msg.type === '__mapFrame') {
         if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
-        return   // don't fall through to other handlers
+        return
       }
 
       if (msg.type === 'route') {
@@ -180,24 +186,26 @@ export default function NavigationScreen({ navigation }) {
   // ── Helmet connect / disconnect ───────────────────────────────────────────
   const sendHelmetConnected = useCallback((helmetIp) => {
     if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
-    HelmetMapStreamer.start(injectJS)    // ← NEW: start streaming via WebView inject
+    HelmetMapStreamer.start(injectJS)
     injectMessage({ type: 'helmetConnected' })
     enableHelmetView()
+    setHelmetConnected(true)   // ← NEW: update button state
   }, [injectMessage, injectJS, enableHelmetView])
 
   const sendHelmetDisconnected = useCallback(() => {
-    HelmetMapStreamer.stop()             // ← NEW
+    HelmetMapStreamer.stop()
     HelmetUDP.send({ type: 'clear' })
     HelmetUDP.destroy()
     injectMessage({ type: 'helmetDisconnected' })
     disableHelmetView()
+    setHelmetConnected(false)  // ← NEW
   }, [injectMessage, disableHelmetView])
 
   // ── App background / foreground ───────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
-        HelmetMapStreamer.stop()         // ← NEW: WebView frozen in background
+        HelmetMapStreamer.stop()
         if (sessionActive.current) {
           locationSub.current?.remove()
           locationSub.current = null
@@ -205,7 +213,7 @@ export default function NavigationScreen({ navigation }) {
       }
       if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
         if (HelmetUDP._targetIp) {
-          HelmetMapStreamer.start(injectJS)  // ← NEW: resume on foreground
+          HelmetMapStreamer.start(injectJS)
         }
         if (sessionActive.current && !locationSub.current) {
           startGPS()
@@ -223,7 +231,7 @@ export default function NavigationScreen({ navigation }) {
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      HelmetMapStreamer.stop()           // ← NEW
+      HelmetMapStreamer.stop()
     }
   }, [])
 
@@ -238,7 +246,7 @@ export default function NavigationScreen({ navigation }) {
           {
             text: 'Stop Navigation', style: 'destructive',
             onPress: async () => {
-              HelmetMapStreamer.stop()   // ← NEW
+              HelmetMapStreamer.stop()
               HelmetUDP.send({ type: 'clear' })
               await stopNavSession()
               sessionActive.current = false
@@ -273,25 +281,48 @@ export default function NavigationScreen({ navigation }) {
         allowUniversalAccessFromFileURLs
         mixedContentMode="always"
       />
+
+      {/* GPS status badge */}
       {gpsStatus !== 'GPS ✓' && (
         <View style={styles.gpsBadge} pointerEvents="none">
           <Text style={styles.gpsBadgeText}>{gpsStatus}</Text>
         </View>
       )}
+
+      {/* Back button */}
       <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
         <Text style={styles.backBtnText}>‹</Text>
       </TouchableOpacity>
+
+      {/* ← NEW: Debug helmet connect/disconnect button (top-right corner)   */}
+      {/* Tap once to connect → starts JPEG streaming to ESP32               */}
+      {/* Tap again to disconnect → stops streaming                          */}
+      <TouchableOpacity
+        style={[styles.debugBtn, helmetConnected && styles.debugBtnActive]}
+        onPress={() => {
+          if (helmetConnected) {
+            sendHelmetDisconnected()
+          } else {
+            sendHelmetConnected(ESP32_IP)
+          }
+        }}
+      >
+        <Text style={styles.backBtnText}>{helmetConnected ? '📡' : '📵'}</Text>
+      </TouchableOpacity>
+
     </View>
   )
 }
 
-const ACCENT = '#00dca0'
-const BG     = 'rgba(10, 12, 16, 0.88)'
-const BORDER = 'rgba(0, 220, 180, 0.18)'
+const ACCENT  = '#00dca0'
+const BG      = 'rgba(10, 12, 16, 0.88)'
+const BORDER  = 'rgba(0, 220, 180, 0.18)'
+const ACTIVE  = 'rgba(0, 220, 160, 0.25)'  // ← NEW: highlight when connected
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a0c10' },
   webview:   { flex: 1, backgroundColor: '#0a0c10' },
+
   gpsBadge: {
     position: 'absolute', top: 80, alignSelf: 'center',
     backgroundColor: BG, borderWidth: 1, borderColor: BORDER,
@@ -302,6 +333,7 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
     fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase',
   },
+
   backBtn: {
     position: 'absolute', top: 12, left: 12,
     width: 36, height: 36, backgroundColor: BG,
@@ -309,4 +341,16 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   backBtnText: { color: ACCENT, fontSize: 24, lineHeight: 28, marginTop: -2 },
+
+  // ← NEW styles for the debug connect button ──────────────────────────────
+  debugBtn: {
+    position: 'absolute', top: 12, right: 12,
+    width: 36, height: 36, backgroundColor: BG,
+    borderWidth: 1, borderColor: BORDER, borderRadius: 5,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  debugBtnActive: {
+    backgroundColor: ACTIVE,
+    borderColor: ACCENT,
+  },
 })

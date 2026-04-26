@@ -339,7 +339,7 @@
     map = L.map('map', { zoomControl: true, attributionControl: false })
           .setView([7.8731, 80.7718], 8)
 
-    activeTileLayer = L.tileLayer(TILE_NORMAL, { maxZoom: 19 })
+    activeTileLayer = L.tileLayer(TILE_NORMAL, { maxZoom: 19, crossOrigin: 'anonymous' })
     activeTileLayer.addTo(map)
 
     activeTileLayer.on('load', () => {
