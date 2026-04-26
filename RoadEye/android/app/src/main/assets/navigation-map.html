@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RoadEye Navigation</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #0f0f1a;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #map { width: 100%; height: 100vh; z-index: 1; }
+
+    #search-container {
+      position: absolute;
+      top: 14px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: calc(100% - 32px);
+      max-width: 480px;
+    }
+
+    #search-box {
+      display: flex; align-items: center;
+      background: #fff; border-radius: 14px;
+      padding: 0 14px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.25);
+      gap: 8px;
+      transition: background 0.3s, border 0.3s;
+    }
+
+    #search-icon { font-size: 16px; color: #888; }
+
+    #search-input {
+      flex: 1; border: none; outline: none;
+      font-size: 15px; padding: 14px 0;
+      color: #1a1a2e; background: transparent;
+      transition: color 0.3s;
+    }
+    #search-input::placeholder { color: #aaa; }
+
+    #search-btn {
+      background: #4F46E5; color: #fff; border: none;
+      border-radius: 10px; padding: 8px 14px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    #suggestions {
+      background: #fff; border-radius: 12px; margin-top: 6px;
+      overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      display: none;
+      transition: background 0.3s;
+    }
+
+    .suggestion-item {
+      padding: 12px 16px; font-size: 13px; color: #1a1a2e;
+      cursor: pointer; border-bottom: 1px solid #f3f4f6;
+      display: flex; align-items: center; gap: 10px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .suggestion-item:last-child { border-bottom: none; }
+    .suggestion-item:hover { background: #f5f5ff; }
+    .suggestion-icon { font-size: 16px; }
+    .suggestion-text { flex: 1; }
+    .suggestion-name { font-weight: 600; }
+    .suggestion-addr { font-size: 11px; color: #888; margin-top: 2px; }
+
+    #info-panel {
+      position: absolute; bottom: 20px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      width: calc(100% - 32px); max-width: 480px;
+      background: #fff; border-radius: 18px;
+      padding: 16px 18px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+      display: none;
+      transition: background 0.3s, border 0.3s;
+    }
+    #info-panel.visible { display: block; }
+
+    #route-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 10px;
+    }
+    #route-title { font-size: 15px; font-weight: 800; color: #1a1a2e; transition: color 0.3s; }
+    #route-meta  { font-size: 12px; color: #6B7280; transition: color 0.3s; }
+
+    #route-stats { display: flex; gap: 12px; margin-bottom: 12px; }
+
+    .stat-box {
+      flex: 1; background: #f5f5ff; border-radius: 10px;
+      padding: 10px; text-align: center;
+      transition: background 0.3s;
+    }
+    .stat-value { font-size: 18px; font-weight: 900; color: #4F46E5; transition: color 0.3s; }
+    .stat-label { font-size: 10px; color: #888; margin-top: 2px; transition: color 0.3s; }
+
+    #instruction-box {
+      background: #4F46E5; border-radius: 12px;
+      padding: 12px 14px; display: flex;
+      align-items: center; gap: 12px; margin-bottom: 10px;
+      transition: background 0.3s, border 0.3s;
+    }
+    #turn-icon { font-size: 22px; }
+    #turn-text { font-size: 13px; color: #fff; font-weight: 600; flex: 1; }
+    #turn-dist { font-size: 12px; color: rgba(255,255,255,0.75); white-space: nowrap; }
+
+    #btn-row { display: flex; gap: 8px; }
+
+    #btn-start {
+      flex: 1; background: #4F46E5; color: #fff; border: none;
+      border-radius: 10px; padding: 11px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.3s;
+    }
+    #btn-clear {
+      background: #fee2e2; color: #ef4444; border: none;
+      border-radius: 10px; padding: 11px 16px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    #locate-btn {
+      position: absolute; bottom: 160px; right: 16px;
+      z-index: 1000; width: 44px; height: 44px;
+      background: #fff; border: none; border-radius: 12px;
+      font-size: 20px; cursor: pointer;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.3s, border 0.3s;
+    }
+
+    #helmet-badge {
+      position: absolute; top: 74px; right: 16px;
+      z-index: 1000; background: #fff; border-radius: 10px;
+      padding: 6px 12px; font-size: 12px; font-weight: 700;
+      color: #6B7280; box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+      display: flex; align-items: center; gap: 6px;
+      transition: background 0.3s, color 0.3s, border 0.3s;
+    }
+    #helmet-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #10b981; animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
+    .leaflet-routing-container { display: none !important; }
+
+    .user-marker {
+      width: 20px; height: 20px;
+      background: #4F46E5; border: 3px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(79,70,229,0.3);
+    }
+
+    #restore-banner {
+      position: absolute; top: 80px; left: 50%;
+      transform: translateX(-50%);
+      z-index: 1001;
+      background: rgba(79,70,229,0.92); color: #fff;
+      border-radius: 10px; padding: 8px 18px;
+      font-size: 13px; font-weight: 700;
+      display: none;
+    }
+    #restore-banner.visible { display: block; }
+
+    /* ── HELMET MODE STYLES ─────────────────────────────────────────────── */
+    body.helmet-mode #search-box {
+      background: #000 !important;
+      border: 1px solid #444;
+    }
+    body.helmet-mode #search-input {
+      color: #fff !important;
+      background: transparent;
+    }
+    body.helmet-mode #search-input::placeholder { color: #666; }
+    body.helmet-mode #search-icon { color: #888; }
+    body.helmet-mode #search-btn {
+      background: #222;
+      border: 1px solid #555;
+      color: #fff;
+    }
+    body.helmet-mode #suggestions {
+      background: #000 !important;
+      border: 1px solid #333;
+    }
+    body.helmet-mode .suggestion-item {
+      color: #fff !important;
+      border-bottom: 1px solid #222;
+      background: #000;
+    }
+    body.helmet-mode .suggestion-item:hover { background: #111 !important; }
+    body.helmet-mode .suggestion-addr { color: #888 !important; }
+
+    body.helmet-mode #info-panel {
+      background: #000 !important;
+      border: 1px solid #333;
+    }
+    body.helmet-mode #route-title { color: #fff !important; }
+    body.helmet-mode #route-meta  { color: #aaa !important; }
+
+    body.helmet-mode .stat-box {
+      background: #111 !important;
+      border: 1px solid #333;
+    }
+    body.helmet-mode .stat-value { color: #fff !important; }
+    body.helmet-mode .stat-label { color: #888 !important; }
+
+    body.helmet-mode #instruction-box {
+      background: #111 !important;
+      border: 1px solid #555;
+    }
+    body.helmet-mode #turn-text { color: #fff; }
+    body.helmet-mode #turn-dist { color: #aaa; }
+
+    body.helmet-mode #btn-start {
+      background: #1a1a1a !important;
+      border: 1px solid #fff;
+      color: #fff;
+    }
+    body.helmet-mode #btn-clear {
+      background: #1a0000 !important;
+      color: #ff6666;
+      border: 1px solid #660000;
+    }
+
+    body.helmet-mode #locate-btn {
+      background: #000 !important;
+      border: 1px solid #444;
+      color: #fff;
+    }
+
+    body.helmet-mode #helmet-badge {
+      background: #000 !important;
+      color: #ccc !important;
+      border: 1px solid #333;
+    }
+
+    body.helmet-mode #restore-banner {
+      background: rgba(0,0,0,0.95);
+      border: 1px solid #555;
+    }
+
+    /* User marker stays visible on dark map */
+    body.helmet-mode .user-marker {
+      background: #fff;
+      border-color: #000;
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.25);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="map"></div>
+
+  <div id="search-container">
+    <div id="search-box">
+      <span id="search-icon">🔍</span>
+      <input id="search-input" type="text" placeholder="Search destination..." autocomplete="off" />
+      <button id="search-btn">Go</button>
+    </div>
+    <div id="suggestions"></div>
+  </div>
+
+  <div id="helmet-badge">
+    <div id="helmet-dot"></div>
+    <span id="helmet-status">Helmet Sync</span>
+  </div>
+
+  <div id="restore-banner">🔄 Restoring navigation…</div>
+
+  <button id="locate-btn" title="My Location">📍</button>
+
+  <div id="info-panel">
+    <div id="route-header">
+      <div id="route-title">Route Found</div>
+      <div id="route-meta"></div>
+    </div>
+    <div id="route-stats">
+      <div class="stat-box">
+        <div class="stat-value" id="stat-dist">—</div>
+        <div class="stat-label">Distance</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="stat-time">—</div>
+        <div class="stat-label">Est. Time</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-value" id="stat-speed">0</div>
+        <div class="stat-label">km/h</div>
+      </div>
+    </div>
+    <div id="instruction-box">
+      <span id="turn-icon">🧭</span>
+      <span id="turn-text">Follow the route</span>
+      <span id="turn-dist"></span>
+    </div>
+    <div id="btn-row">
+      <button id="btn-start">▶ Start Navigation</button>
+      <button id="btn-clear">✕ Clear</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+  <script>
+    let map, userMarker, userCircle, routingControl
+    let userLat = null, userLng = null
+    let destLat = null, destLng = null
+    let destName = null
+    let watchId = null
+    let currentInstructions = []
+    let currentStep = 0
+    let navigationActive = false
+    let searchTimeout = null
+    let mapReady = false
+    let pendingRestore = null
+
+    // ── Tile URL constants ────────────────────────────────────────────────────
+    const TILE_NORMAL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+    // dark_all = dark background + white road labels
+    const TILE_HELMET = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+
+    let helmetMode = false
+    let activeTileLayer = null
+
+    // ── Map init ──────────────────────────────────────────────────────────────
+    map = L.map('map', { zoomControl: true, attributionControl: false })
+          .setView([7.8731, 80.7718], 8)
+
+    activeTileLayer = L.tileLayer(TILE_NORMAL, { maxZoom: 19, crossOrigin: 'anonymous' })
+    activeTileLayer.addTo(map)
+
+    activeTileLayer.on('load', () => {
+      if (!mapReady) {
+        mapReady = true
+        if (pendingRestore) { restoreRoute(pendingRestore); pendingRestore = null }
+      }
+    })
+    setTimeout(() => {
+      if (!mapReady) {
+        mapReady = true
+        if (pendingRestore) { restoreRoute(pendingRestore); pendingRestore = null }
+      }
+    }, 3000)
+
+    // ── Helmet mode toggle ────────────────────────────────────────────────────
+    function toggleHelmetMode(on) {
+      helmetMode = on
+      document.body.classList.toggle('helmet-mode', on)
+
+      // Swap tile layer
+      map.removeLayer(activeTileLayer)
+      activeTileLayer = L.tileLayer(on ? TILE_HELMET : TILE_NORMAL, { maxZoom: 19, crossOrigin: 'anonymous' })
+      activeTileLayer.addTo(map)
+
+      // Update route line color if a route is active
+      if (routingControl) {
+        const lineColor = on ? '#ffffff' : '#4F46E5'
+        const lineWeight = on ? 6 : 5
+
+        // Update option for future rebuilds
+        routingControl.options.lineOptions = {
+          styles: [{ color: lineColor, weight: lineWeight, opacity: 1 }]
+        }
+
+        // Update currently drawn line immediately
+        if (routingControl._line) {
+          routingControl._line.setStyle({ color: lineColor, weight: lineWeight })
+        }
+      }
+
+      // Update destination marker color
+      if (routingControl && destLat && destLng) {
+        // Re-render the destination pin with new color
+        const markerColor = on ? '#ffffff' : '#ef4444'
+        const markerBorder = on ? '#000000' : '#fff'
+        routingControl.options.createMarker = (i, wp) => {
+          if (i === 0) return null
+          return L.marker(wp.latLng, {
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="background:${markerColor};width:14px;height:14px;border-radius:50%;border:2px solid ${markerBorder};box-shadow:0 2px 6px rgba(0,0,0,0.5)"></div>`,
+              iconSize: [14, 14], iconAnchor: [7, 7],
+            })
+          })
+        }
+      }
+
+      postToApp({ type: 'helmetViewToggled', active: on })
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+    function placeUserMarker(lat, lng) {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="user-marker"></div>',
+        iconSize: [20, 20], iconAnchor: [10, 10],
+      })
+      if (userMarker) {
+        userMarker.setLatLng([lat, lng])
+        userCircle.setLatLng([lat, lng])
+      } else {
+        userMarker = L.marker([lat, lng], { icon, zIndexOffset: 1000 }).addTo(map)
+        userCircle = L.circle([lat, lng], {
+          radius: 40, color: '#4F46E5',
+          fillColor: '#4F46E5', fillOpacity: 0.15, weight: 1,
+        }).addTo(map)
+      }
+    }
+
+    function postToApp(data) {
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(JSON.stringify(data))
+      }
+    }
+
+    function startLocationWatch() {
+      if (!navigator.geolocation) { alert('Geolocation not supported.'); return }
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          userLat = pos.coords.latitude
+          userLng = pos.coords.longitude
+          const speed = pos.coords.speed ? Math.round(pos.coords.speed * 3.6) : 0
+          placeUserMarker(userLat, userLng)
+          document.getElementById('stat-speed').textContent = speed
+          postToApp({ type: 'location', lat: userLat, lng: userLng, speed })
+          if (navigationActive && currentInstructions.length > 0) updateNavigationStep()
+        },
+        (err) => console.warn('GPS error:', err.message),
+        { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+      )
+    }
+
+    function centerOnUser() {
+      if (userLat !== null) {
+        map.setView([userLat, userLng], 16)
+      } else {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          userLat = pos.coords.latitude
+          userLng = pos.coords.longitude
+          placeUserMarker(userLat, userLng)
+          map.setView([userLat, userLng], 16)
+        })
+      }
+    }
+
+    document.getElementById('locate-btn').addEventListener('click', centerOnUser)
+
+    // ── Search ────────────────────────────────────────────────────────────────
+    async function searchLocation(query) {
+      if (!query.trim()) return
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`
+      try {
+        const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } })
+        const data = await res.json()
+        showSuggestions(data)
+      } catch (e) { console.error('Search error:', e) }
+    }
+
+    function showSuggestions(results) {
+      const box = document.getElementById('suggestions')
+      box.innerHTML = ''
+      if (!results.length) { box.style.display = 'none'; return }
+      results.forEach(r => {
+        const item = document.createElement('div')
+        item.className = 'suggestion-item'
+        const name = r.name || r.display_name.split(',')[0]
+        item.innerHTML = `
+          <span class="suggestion-icon">📍</span>
+          <div class="suggestion-text">
+            <div class="suggestion-name">${name}</div>
+            <div class="suggestion-addr">${r.display_name}</div>
+          </div>`
+        item.addEventListener('click', () => {
+          selectDestination(parseFloat(r.lat), parseFloat(r.lon), name)
+          document.getElementById('search-input').value = name
+          box.style.display = 'none'
+        })
+        box.appendChild(item)
+      })
+      box.style.display = 'block'
+    }
+
+    function selectDestination(lat, lng, name) {
+      destLat  = lat
+      destLng  = lng
+      destName = name
+      if (!userLat) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          userLat = pos.coords.latitude
+          userLng = pos.coords.longitude
+          placeUserMarker(userLat, userLng)
+          buildRoute(name)
+        }, () => alert('Could not get your location. Please enable GPS.'), { enableHighAccuracy: true })
+      } else {
+        buildRoute(name)
+      }
+    }
+
+    // ── Restore saved session ─────────────────────────────────────────────────
+    function restoreRoute(msg) {
+      destLat  = msg.destLat
+      destLng  = msg.destLng
+      destName = msg.destination
+
+      document.getElementById('search-input').value = destName || ''
+      document.getElementById('restore-banner').classList.add('visible')
+
+      const doRestore = () => {
+        document.getElementById('restore-banner').classList.remove('visible')
+        buildRoute(destName, true)
+      }
+
+      if (userLat !== null) {
+        doRestore()
+      } else {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          userLat = pos.coords.latitude
+          userLng = pos.coords.longitude
+          placeUserMarker(userLat, userLng)
+          doRestore()
+        }, () => {
+          document.getElementById('restore-banner').classList.remove('visible')
+        }, { enableHighAccuracy: true, timeout: 8000 })
+      }
+    }
+
+    // ── Build route ───────────────────────────────────────────────────────────
+    function buildRoute(name, autoStart) {
+      if (routingControl) { map.removeControl(routingControl); routingControl = null }
+
+      const lineColor  = helmetMode ? '#ffffff' : '#4F46E5'
+      const lineWeight = helmetMode ? 6 : 5
+      const pinColor   = helmetMode ? '#ffffff' : '#ef4444'
+      const pinBorder  = helmetMode ? '#000000' : '#fff'
+
+      routingControl = L.Routing.control({
+        waypoints: [ L.latLng(userLat, userLng), L.latLng(destLat, destLng) ],
+        routeWhileDragging: false,
+        addWaypoints: false,
+        fitSelectedRoutes: true,
+        lineOptions: { styles: [{ color: lineColor, weight: lineWeight, opacity: 1 }] },
+        createMarker: (i, wp) => {
+          if (i === 0) return null
+          return L.marker(wp.latLng, {
+            icon: L.divIcon({
+              className: '',
+              html: `<div style="background:${pinColor};width:14px;height:14px;border-radius:50%;border:2px solid ${pinBorder};box-shadow:0 2px 6px rgba(0,0,0,0.3)"></div>`,
+              iconSize: [14, 14], iconAnchor: [7, 7],
+            })
+          })
+        },
+        router: L.Routing.osrmv1({
+          serviceUrl: 'https://router.project-osrm.org/route/v1',
+          profile: 'driving',
+        }),
+      }).addTo(map)
+
+      routingControl.on('routesfound', (e) => {
+        const route   = e.routes[0]
+        const distKm  = (route.summary.totalDistance / 1000).toFixed(1)
+        const mins    = Math.round(route.summary.totalTime / 60)
+        const hrs     = Math.floor(mins / 60)
+        const remMin  = mins % 60
+        const timeStr = hrs > 0 ? `${hrs}h ${remMin}m` : `${mins}m`
+
+        document.getElementById('stat-dist').textContent = `${distKm}km`
+        document.getElementById('stat-time').textContent = timeStr
+        document.getElementById('route-meta').textContent = name || 'Destination'
+
+        currentInstructions = route.instructions || []
+        currentStep = 0
+        showStep(0)
+
+        postToApp({
+          type:        'route',
+          destination: name,
+          destLat:     destLat,
+          destLng:     destLng,
+          distKm:      distKm,
+          etaMin:      mins,
+          steps: currentInstructions.map(s => ({
+            text:     s.text,
+            distance: Math.round(s.distance),
+            type:     s.type,
+          }))
+        })
+
+        document.getElementById('info-panel').classList.add('visible')
+
+        if (autoStart) {
+          navigationActive = true
+          currentStep = 0
+          showStep(0)
+          if (userLat) map.setView([userLat, userLng], 17)
+          document.getElementById('btn-start').textContent = '🧭 Navigating...'
+          document.getElementById('btn-start').style.background = helmetMode ? '#1a1a1a' : '#10b981'
+        }
+      })
+    }
+
+    // ── Navigation step display ───────────────────────────────────────────────
+    function showStep(index) {
+      if (!currentInstructions.length) return
+      const step  = currentInstructions[Math.min(index, currentInstructions.length - 1)]
+      const icons = {
+        'Straight': '⬆️', 'SlightRight': '↗️', 'Right': '➡️',
+        'SharpRight': '↪️', 'TurnAround': '🔄', 'SharpLeft': '↩️',
+        'Left': '⬅️', 'SlightLeft': '↖️', 'Roundabout': '🔃',
+        'WaypointReached': '📍', 'DestinationReached': '🏁',
+      }
+      const icon = icons[step.type] || '🧭'
+      const dist = step.distance > 1000
+        ? `${(step.distance / 1000).toFixed(1)} km`
+        : `${Math.round(step.distance)} m`
+
+      document.getElementById('turn-icon').textContent = icon
+      document.getElementById('turn-text').textContent = step.text
+      document.getElementById('turn-dist').textContent = dist
+
+      postToApp({ type: 'step', arrow: icon, text: step.text, dist })
+    }
+
+    function updateNavigationStep() {
+      if (!userLat || !currentInstructions.length) return
+      const step = currentInstructions[currentStep]
+      if (!step || !step.waypoint) return
+      const d = map.distance([userLat, userLng], step.waypoint)
+      if (d < 25 && currentStep < currentInstructions.length - 1) {
+        currentStep++
+        showStep(currentStep)
+      }
+      if (currentStep >= currentInstructions.length - 1 && d < 30) {
+        document.getElementById('turn-icon').textContent = '🏁'
+        document.getElementById('turn-text').textContent = 'You have arrived!'
+        document.getElementById('turn-dist').textContent = ''
+        navigationActive = false
+        postToApp({ type: 'arrived', destination: destName })
+      }
+    }
+
+    // ── Button handlers ───────────────────────────────────────────────────────
+    document.getElementById('btn-start').addEventListener('click', () => {
+      if (!routingControl) return
+      navigationActive = true
+      currentStep = 0
+      showStep(0)
+      if (userLat) map.setView([userLat, userLng], 17)
+      document.getElementById('btn-start').textContent  = '🧭 Navigating...'
+      document.getElementById('btn-start').style.background = helmetMode ? '#1a1a1a' : '#10b981'
+    })
+
+    document.getElementById('btn-clear').addEventListener('click', () => {
+      if (routingControl) { map.removeControl(routingControl); routingControl = null }
+      document.getElementById('info-panel').classList.remove('visible')
+      document.getElementById('search-input').value = ''
+      document.getElementById('btn-start').textContent = '▶ Start Navigation'
+      document.getElementById('btn-start').style.background = helmetMode ? '#222' : '#4F46E5'
+      navigationActive = false
+      currentInstructions = []
+      currentStep = 0
+      destLat = null; destLng = null; destName = null
+      postToApp({ type: 'clear' })
+    })
+
+    // ── Search input events ───────────────────────────────────────────────────
+    const searchInput = document.getElementById('search-input')
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimeout)
+      const q = searchInput.value.trim()
+      if (q.length < 2) { document.getElementById('suggestions').style.display = 'none'; return }
+      searchTimeout = setTimeout(() => searchLocation(q), 400)
+    })
+    document.getElementById('search-btn').addEventListener('click', () => searchLocation(searchInput.value))
+    searchInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchLocation(searchInput.value) })
+    document.addEventListener('click', (e) => {
+      if (!document.getElementById('search-container').contains(e.target))
+        document.getElementById('suggestions').style.display = 'none'
+    })
+
+    // ── Message handler from React Native ─────────────────────────────────────
+    window.addEventListener('message', (e) => {
+      try {
+        const msg = JSON.parse(e.data)
+
+        if (msg.type === 'gps' && msg.lat && msg.lng) {
+          userLat = msg.lat; userLng = msg.lng
+          placeUserMarker(userLat, userLng)
+          document.getElementById('stat-speed').textContent = msg.speed || 0
+          if (navigationActive && currentInstructions.length > 0) updateNavigationStep()
+        }
+
+        if (msg.type === 'restoreRoute' && msg.destLat && msg.destLng) {
+          if (mapReady) {
+            restoreRoute(msg)
+          } else {
+            pendingRestore = msg
+          }
+        }
+
+        // ── Helmet view toggle ─────────────────────────────────────────────
+        if (msg.type === 'helmetView') {
+          toggleHelmetMode(msg.active)
+        }
+
+        if (msg.type === 'helmetConnected') {
+          document.getElementById('helmet-dot').style.background = '#10b981'
+          document.getElementById('helmet-status').textContent = 'Helmet Connected'
+          // Auto-enable helmet view when helmet WiFi connects
+          toggleHelmetMode(true)
+        }
+        if (msg.type === 'helmetDisconnected') {
+          document.getElementById('helmet-dot').style.background = '#ef4444'
+          document.getElementById('helmet-status').textContent = 'Helmet Offline'
+          // Restore normal view when helmet disconnects
+          toggleHelmetMode(false)
+        }
+
+      } catch (_) {}
+    })
+
+    startLocationWatch()
+    setTimeout(centerOnUser, 1000)
+  </script>
+</body>
+</html>
