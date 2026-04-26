@@ -9,7 +9,7 @@ buildscript {
     kotlinVersion = findProperty('android.kotlinVersion') ?: '1.9.23'
     ndkVersion = "26.1.10909125"
 
-    ffmpegKitPackage = "audio"
+    
 }
     repositories {
         google()
@@ -38,5 +38,7 @@ allprojects {
         google()
         mavenCentral()
         maven { url 'https://www.jitpack.io' }
+
+         maven { url 'https://packagecloud.io/arthenica/maven/maven2' }
     }
 }

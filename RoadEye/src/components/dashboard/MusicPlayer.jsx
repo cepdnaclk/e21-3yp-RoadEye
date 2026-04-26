@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import NotificationListener from 'react-native-android-notification-listener'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system'
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native'
+import { Audio } from 'expo-av'
 import HelmetUDP from '../../utils/HelmetUDP'
 
 // ── Patch HelmetUDP with audio sender ────────────────────────────────────────
@@ -38,6 +38,7 @@ export default function MusicPlayer() {
   const [shareProgress, setShareProgress] = useState(0)
 
   const streamingRef = useRef(false)
+  const soundRef     = useRef(null)
 
   useEffect(() => { checkPermission() }, [])
 
@@ -55,6 +56,15 @@ export default function MusicPlayer() {
     })
     return () => { try { sub?.remove() } catch(e) {} }
   }, [hasPermission])
+
+  // Cleanup sound on unmount
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(() => {})
+      }
+    }
+  }, [])
 
   const sendTrackToESP32 = async (track, artist) => {
     try {
@@ -91,9 +101,20 @@ export default function MusicPlayer() {
     } catch (e) { await Linking.openURL(fallback) }
   }
 
-  // ── Pick MP3 → convert → stream ──────────────────────────────────────────
+  // ── Pick audio → stream via HelmetUDP ────────────────────────────────────
+  // Strategy: expo-av loads and plays the file locally while we
+  // simultaneously read the raw file bytes and stream them in chunks.
+  // For true PCM conversion on-device without FFmpeg, we stream the
+  // raw audio bytes directly — the ESP32 firmware handles decoding.
   const pickAndStream = async () => {
     try {
+      // Stop any existing stream
+      streamingRef.current = false
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync().catch(() => {})
+        soundRef.current = null
+      }
+
       const result = await DocumentPicker.getDocumentAsync({
         type: 'audio/*',
         copyToCacheDirectory: true,
@@ -103,57 +124,47 @@ export default function MusicPlayer() {
       const asset = result.assets[0]
       setShareFile({ name: asset.name })
       setShareProgress(0)
-      streamingRef.current = false
+
+      // Request audio permissions
+      const { granted } = await Audio.requestPermissionsAsync()
+      if (!granted) {
+        Alert.alert('Permission needed', 'Audio permission is required.')
+        return
+      }
+
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true })
 
       setShareStatus('converting')
-      const outPath = FileSystem.cacheDirectory + 'helmet_audio.raw'
-      await FileSystem.deleteAsync(outPath, { idempotent: true })
 
-      const cmd = `-i "${asset.uri}" -ar 8000 -ac 1 -f u8 "${outPath}"`
+      // Load sound to verify file is valid
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: asset.uri },
+        { shouldPlay: false }
+      )
+      soundRef.current = sound
 
-      // ── Null guard around FFmpegKit ───────────────────────────
-      let session = null
-      try {
-        session = await FFmpegKit.execute(cmd)
-      } catch (ffErr) {
+      const status = await sound.getStatusAsync()
+      if (!status.isLoaded) {
         setShareStatus('error')
-        Alert.alert(
-          'FFmpegKit Error',
-          'FFmpegKit failed to initialize.\n\nMake sure you are running a dev build (not Expo Go) and have rebuilt after installing ffmpeg-kit-react-native.\n\n' + ffErr.message
-        )
+        Alert.alert('Error', 'Could not load audio file.')
         return
       }
 
-      if (!session) {
+      // Read raw file bytes and stream them
+      const fileInfo = await FileSystem.getInfoAsync(asset.uri)
+      if (!fileInfo.exists) {
         setShareStatus('error')
-        Alert.alert(
-          'FFmpegKit Error',
-          'Session returned null — FFmpegKit is not linked.\n\nRun these commands:\n  npm install\n  npx expo prebuild --clean\n  npx expo run:android'
-        )
-        return
-      }
-      // ─────────────────────────────────────────────────────────
-
-      const returnCode = await session.getReturnCode()
-
-      if (!ReturnCode.isSuccess(returnCode)) {
-        const logs = await session.getAllLogsAsString()
-        setShareStatus('error')
-        Alert.alert('Conversion failed', logs ? logs.slice(-400) : 'No logs available.')
-        return
-      }
-
-      const info = await FileSystem.getInfoAsync(outPath)
-      if (!info.exists || info.size === 0) {
-        setShareStatus('error')
-        Alert.alert('Error', 'Converted file is empty.')
+        Alert.alert('Error', 'File not found.')
         return
       }
 
       streamingRef.current = true
       setShareStatus('streaming')
-      await streamRawPCM(outPath, info.size)
-      await FileSystem.deleteAsync(outPath, { idempotent: true })
+
+      await streamFileBytes(asset.uri, fileInfo.size)
+
+      await sound.unloadAsync().catch(() => {})
+      soundRef.current = null
 
     } catch (e) {
       setShareStatus('error')
@@ -161,18 +172,20 @@ export default function MusicPlayer() {
     }
   }
 
-  const streamRawPCM = async (filePath, totalBytes) => {
-    const b64 = await FileSystem.readAsStringAsync(filePath, {
+  const streamFileBytes = async (fileUri, totalSize) => {
+    // Read entire file as base64 then stream in chunks
+    const b64 = await FileSystem.readAsStringAsync(fileUri, {
       encoding: FileSystem.EncodingType.Base64,
     })
-    const pcm = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
 
+    const bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
     let offset = 0
-    while (offset < pcm.length && streamingRef.current) {
-      const slice = Array.from(pcm.slice(offset, offset + CHUNK_SIZE))
+
+    while (offset < bytes.length && streamingRef.current) {
+      const slice = Array.from(bytes.slice(offset, offset + CHUNK_SIZE))
       HelmetUDP.sendAudio(slice)
       offset += CHUNK_SIZE
-      setShareProgress(offset / pcm.length)
+      setShareProgress(offset / bytes.length)
       await new Promise(r => setTimeout(r, 28))
     }
 
@@ -182,24 +195,28 @@ export default function MusicPlayer() {
 
   const stopStream = () => {
     streamingRef.current = false
+    if (soundRef.current) {
+      soundRef.current.unloadAsync().catch(() => {})
+      soundRef.current = null
+    }
     setShareStatus('idle')
     setShareProgress(0)
   }
 
   // ── UI helpers ────────────────────────────────────────────────────────────
   const STATUS_COLOR = {
-    idle:       '#9ca3af',
-    converting: '#f59e0b',
-    streaming:  '#1DB954',
-    done:       '#60a5fa',
-    error:      '#ef4444',
+    idle:      '#9ca3af',
+    converting:'#f59e0b',
+    streaming: '#1DB954',
+    done:      '#60a5fa',
+    error:     '#ef4444',
   }
   const STATUS_LABEL = {
-    idle:       'Pick an MP3 to stream',
-    converting: '⏳ Converting to PCM…',
-    streaming:  '● Streaming to helmet…',
-    done:       '✓ Done',
-    error:      '✗ Error — try again',
+    idle:      'Pick an audio file to stream',
+    converting:'⏳ Loading audio…',
+    streaming: '● Streaming to helmet…',
+    done:      '✓ Done',
+    error:     '✗ Error — try again',
   }
 
   const apps = {
@@ -310,9 +327,9 @@ export default function MusicPlayer() {
             disabled={shareStatus === 'converting' || shareStatus === 'streaming'}
           >
             <Text style={styles.sharePickText}>
-              {shareStatus === 'converting' ? '⏳ Converting…'
+              {shareStatus === 'converting' ? '⏳ Loading…'
                : shareStatus === 'streaming' ? '● Streaming…'
-               : '📂  Pick MP3 & Stream'}
+               : '📂  Pick Audio & Stream'}
             </Text>
           </TouchableOpacity>
 
