@@ -26,35 +26,37 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
-            .cors(cors -> {})  // uses your CorsConfigurationSource bean from AppConfiguration
-            .sessionManagement(session ->
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            )
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints — no token needed
-                .requestMatchers(
-                    "/api/users/register",
-                    "/api/users/login",
-                    "/api/auth/**",
-                    "/api/tilt/event"         // covers any future /api/auth/* routes
-                ).permitAll()
-                // Everything else requires a valid JWT
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-            // .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // .csrf(csrf -> csrf.disable())
+                .csrf(org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer::disable)
+                .cors(cors -> {
+                }) // uses your CorsConfigurationSource bean from AppConfiguration
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .authorizeHttpRequests(auth -> auth
+                        // Public endpoints — no token needed
+                        .requestMatchers(
+                                "/api/users/register",
+                                "/api/users/login",
+                                "/api/auth/**",
+                                "/api/tilt/event")
+                                // "/api/speed/**")
+                        .permitAll()
+                        .requestMatchers("/api/speed/**").authenticated()
+                        // Everything else requires a valid JWT
+                        // .anyRequest().authenticated()
+                        .anyRequest().permitAll())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        // .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    //Required by UserController — BCrypt password encoder
+    // Required by UserController — BCrypt password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    //Required if you use AuthenticationManager anywhere
+    // Required if you use AuthenticationManager anywhere
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
