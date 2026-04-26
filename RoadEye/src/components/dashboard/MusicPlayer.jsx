@@ -11,18 +11,37 @@ import { WebView } from 'react-native-webview'
 import HelmetUDP from '../../utils/HelmetUDP'
 
 // ── Patch HelmetUDP with audio sender ────────────────────────────────────────
+// ── Patch HelmetUDP with audio sender ────────────────────────────────────────
 if (!HelmetUDP.sendAudio) {
   HelmetUDP.sendAudio = function (pcmChunk) {
+    // Bypass _enqueue entirely — it silently pushes to _queue when _ready is
+    // false, which happens any time the socket rebinds (navigation, reconnect).
+    // Instead, grab the live socket reference directly at send-time.
+    const socket = this._socket
+    const ip     = this._targetIp
+    const port   = this._targetPort
+    if (!socket || !ip) {
+      console.warn('[sendAudio] skipped — socket or targetIp not ready')
+      return
+    }
+
     const frameId = this._nextFrameId()
-    const hdr = [
+    const payload = [
       0x02,
       frameId & 0xFF,
       (frameId >> 8) & 0xFF,
       0,
       1,
       pcmChunk.length,  // safe: CHUNK_SIZE=240 fits in uint8 (<= 250)
+      ...pcmChunk,
     ]
-    this._enqueue([...hdr, ...pcmChunk])
+
+    // react-native-udp requires a Buffer, not Uint8Array — passing Uint8Array
+    // fails silently on some RN versions (zero bytes sent, no error callback).
+    const buf = Buffer.from(payload)
+    socket.send(buf, 0, buf.length, port, ip, (err) => {
+      if (err) console.warn('[sendAudio] UDP send error:', err.message)
+    })
   }.bind(HelmetUDP)
 }
 
