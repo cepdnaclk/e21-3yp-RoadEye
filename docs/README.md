@@ -157,13 +157,14 @@ Data Flow
 
 **e) Anti-Theft System**
 - Detects movement when parked  
-- Sends alert to mobile  
+- Sends alert to mobile
 
-
-
+  
 #### 🔹 3. Communication
 - WiFi-based communication  
-- Optional Bluetooth pairing for authentication  
+- Optional Bluetooth pairing for authentication
+
+
 
 
 ### 💻 Software Design
@@ -188,6 +189,7 @@ Data Flow
 
 
 
+
 #### 🔹 2. Mobile Application
 
 **a) Frontend**
@@ -209,12 +211,14 @@ Data Flow
 
 
 
+
 #### 🔹 3. Data Flow Design
 - Real-time data → Helmet alerts  
 - Logged data → Mobile app storage  
 - Processed data → Analytics dashboard
 
 --- 
+
 
 ## Testing
 
@@ -281,7 +285,6 @@ Tested with real users (motorcycle riders):
 | HUD    | Easy to use         |
 | Alerts | Non-distracting     |
 | Audio  | Clear               |
-
 
 
 ### Summary of Results
