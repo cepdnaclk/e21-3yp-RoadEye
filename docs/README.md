@@ -55,7 +55,7 @@ riding experience.
 ## Solution Architecture
 
 <p align="center">
-  <img src="/docs/images/system-flow-chart2.png" width="600">
+  <img src="/e21-3yp-RoadEye/docs/images/system-flow-chart2.png" width="600">
 </p>
 
 ### Description
