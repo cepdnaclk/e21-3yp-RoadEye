@@ -20,15 +20,12 @@ import {
 import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
+import { useAuth } from '../hooks/useAuth'
 
 import { getESP32IP } from '../utils/ESP32Discovery'
 
-// ── Auth — replace with your actual auth context / store ─────────────────────
-// These are placeholders; swap in however you retrieve userId and token.
-const getCurrentUserId = () => null   // e.g. authStore.userId
-const getCurrentToken  = () => null   // e.g. authStore.token
-
 export default function NavigationScreen({ navigation }) {
+  const { userId, token } = useAuth()
   const webViewRef    = useRef(null)
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
@@ -103,12 +100,12 @@ export default function NavigationScreen({ navigation }) {
         sendSpeedEvent(
           {
             speed:        speedKmh,
-            userId:       getCurrentUserId(),
+            userId:       userId,
             totalDistKm:  totalDistKmRef.current,
             startWmoCode: weatherCodesRef.current.startWmoCode,
             destWmoCode:  weatherCodesRef.current.destWmoCode,
           },
-          getCurrentToken(),
+          token,
         )
       }
     )
