@@ -12,7 +12,7 @@
 
 import { getNavState } from '../utils/NavigationSession'
 
-const BASE_URL = 'http://YOUR-IP:8080/api'
+const BASE_URL = 'http://192.168.137.174:8080/api'
 
 // ── WMO weather-code → PCLink WeatherIcon (1=sunny 2=cloudy 3=rain) ──────────
 // Mirrors the wmoIcon() mapping in WeatherCard.jsx but returns the integer
