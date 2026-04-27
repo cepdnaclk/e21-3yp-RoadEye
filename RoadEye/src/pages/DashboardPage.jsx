@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
@@ -6,6 +6,12 @@ import { colors } from '../utils/theme'
 import Svg, { Path } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavSession, stopNavSession } from '../utils/NavigationSession'
+
+//Imports for speed and tilt
+// import { useEffect, useRef } from 'react'
+import { sendSpeedEvent } from '../api/speedApi'
+import { sendTiltEvent } from '../api/tiltApi'
+import { Alert } from 'react-native'
 
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard     from '../components/dashboard/WeatherCard'
@@ -34,6 +40,13 @@ export default function DashboardPage() {
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
+  const lastSentRef = useRef(0)
+  const lastTiltSentRef = useRef(0)
+
+  // Replace properly later
+  const userId = "1f84393a-7f45-46c8-9261-cb313fc1dce9"
+  const token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJoaXJ1YWRpa2FyaTI4QGdtYWlsLmNvbSIsImlhdCI6MTc3NzI2Mzk0NCwiZXhwIjoxNzc3MzUwMzQ0fQ.XdkilkLkpkIW6EJR3LiP3YDd-snarypxmMhBkxRB-vg"
+
   // ── Live helmet data state ────────────────────────────────────────────────
   const [helmetData, setHelmetData]             = useState(null)
   const [helmetConnected, setHelmetConnected]   = useState(false)
@@ -61,6 +74,70 @@ export default function DashboardPage() {
 
   // Live session state
   const navSession = useNavSession()
+
+  // ───────── SPEED SENDING ─────────
+  useEffect(() => {
+      if (!helmetData || !helmetConnected || !userId || !token) return
+
+      const now = Date.now()
+
+      if (now - lastSentRef.current < 5000) return
+
+      lastSentRef.current = now
+
+      const payload = {
+        userId,
+        speed: Number(helmetData.speed) || 0,
+        latitude: helmetData.latitude || 6.9,
+        longitude: helmetData.longitude || 79.8,
+      }
+
+      console.log("📡 Sending speed:", payload)
+
+      sendSpeedEvent(payload, token)
+
+    }, [helmetData, helmetConnected])
+
+
+
+    // ───────── TILT DETECTION ─────────
+    useEffect(() => {
+      if (!helmetData || !helmetConnected || !userId || !token) return
+
+      const roll = helmetData.roll || 0
+      const now = Date.now()
+
+      if (Math.abs(roll) <= 21) return
+
+        if (now - lastTiltSentRef.current < 10000) return
+
+        lastTiltSentRef.current = now
+
+        const payload = {
+          userId,
+          tiltAngle: roll,
+          latitude: helmetData.latitude || 6.9,
+          longitude: helmetData.longitude || 79.8,
+        }
+
+        console.log("⚠️ Sending tilt:", payload)
+
+        const sendTilt = async () => {
+        const res = await sendTiltEvent(payload, token)
+
+        if (res?.triggered) {
+          Alert.alert(
+            "⚠️ Dangerous Tilt Detected",
+            `Tilt: ${res.tiltAngle}° (Threshold: ${res.threshold}°)`
+          )
+        }
+      
+      }
+      sendTilt()
+      
+
+    }, [helmetData, helmetConnected, userId, token])
+
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
