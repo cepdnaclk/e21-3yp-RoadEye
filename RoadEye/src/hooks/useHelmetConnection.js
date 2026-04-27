@@ -16,7 +16,7 @@ const CFG = {
   reconnectAttempts:  3,
   reconnectDelay:     2000,
   connectionTimeout:  6000,
-  pingInterval:       3000,
+  pingInterval:       5000,
 }
 
 export function useHelmetConnection() {

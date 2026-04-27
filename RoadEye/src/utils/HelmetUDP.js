@@ -266,6 +266,9 @@ class _HelmetUDP {
   // ── Configuration ──────────────────────────────────────────────────────────
 
   setTarget(ip, port = 4210) {
+    if (this._targetIp === ip && this._targetPort === port && this._socket) {
+      return  // ← ADD THIS: Don't destroy/recreate if already connected to this IP
+  }
     this._targetIp   = ip
     this._targetPort = port
     this._initSocket()
@@ -396,6 +399,11 @@ class _HelmetUDP {
       this._socket = null
     }
     this._targetIp = null
+  }
+
+  /** Returns true if we have a valid target IP and socket is ready to send. */
+  hasPeerIP() {
+    return !!this._targetIp && this._ready
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
