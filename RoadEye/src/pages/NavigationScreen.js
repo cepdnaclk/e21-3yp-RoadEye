@@ -21,7 +21,7 @@ import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 
-const ESP32_IP = '192.168.137.112'
+const ESP32_IP = 'esp32.local'
 
 // ── Auth — replace with your actual auth context / store ─────────────────────
 // These are placeholders; swap in however you retrieve userId and token.
