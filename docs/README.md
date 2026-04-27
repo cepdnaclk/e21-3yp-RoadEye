@@ -3,13 +3,14 @@ layout: home
 permalink: index.html
 
 # Please update this with your repository name and project title
-repository-name: eYY-3yp-RoadEye
+repository-name: e21-3yp-RoadEye
 title: RoadEye
 ---
 
 [comment]: # "This is the standard layout for the project, but you can clean this and use your own template"
 
 # Project Title
+## RoadEye
 
 ---
 
@@ -211,11 +212,86 @@ Data Flow
 #### 🔹 3. Data Flow Design
 - Real-time data → Helmet alerts  
 - Logged data → Mobile app storage  
-- Processed data → Analytics dashboard  
+- Processed data → Analytics dashboard
+
+--- 
 
 ## Testing
 
-Testing done on hardware and software, detailed + summarized results
+### 🔬 Hardware Testing
+
+#### 1. Sensor Accuracy Testing
+Compared sensor outputs with real-world measurements.
+
+| Sensor           | Result                          |
+|------------------|---------------------------------|
+| Distance Sensors | ±5 cm accuracy                  |
+| IMU              | Stable orientation detection    |
+| Light Sensor     | Correct brightness adaptation   |
+
+
+#### 2. Communication Testing
+WiFi latency and connection stability were evaluated.
+
+| Test              | Result           |
+|-------------------|------------------|
+| Helmet ↔ Bike     | < 100 ms delay   |
+| Helmet ↔ App      | Stable connection|
+
+
+#### 3. Power Testing
+Battery performance under normal usage:
+
+- **Helmet Unit:** ~6–8 hours  
+- **Bike Module:** ~10 hours  
+
+
+#### 4. HUD Testing
+Visibility and usability under different conditions:
+
+- Daylight   
+- Night  
+- No significant eye strain observed  
+
+
+### 💻 Software Testing
+
+#### 1. Unit Testing
+- Individual sensor modules tested  
+- Alert triggering mechanisms verified  
+
+
+#### 2. Integration Testing
+- Helmet ↔ Bike communication validated  
+- Mobile App ↔ Helmet synchronization tested  
+
+
+#### 3. System Testing
+Full system tested under simulated riding conditions:
+
+- Collision alerts triggered correctly  
+- Emergency alerts sent successfully  
+
+
+#### 4. User Testing
+Tested with real users (motorcycle riders):
+
+| Feature| Feedback            |
+|--------|---------------------|
+| HUD    | Easy to use         |
+| Alerts | Non-distracting     |
+| Audio  | Clear               |
+
+
+
+### Summary of Results
+
+- Real-time alert accuracy: **High**  
+- System latency: **Low**  
+- User distraction: **Minimal**  
+- Overall reliability: **Stable under most conditions**
+
+---
 
 ## Detailed budget
 
