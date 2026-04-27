@@ -82,7 +82,7 @@ const CHUNK_SIZE       = 200
 const MS_PER_CHUNK     = (CHUNK_SIZE / TARGET_SAMPLE_RATE) * 1000
 const SEND_HEADROOM_MS = 2
 
-const ESP32_URL = `http://192.168.137.210/track`
+const ESP32_URL = `http://192.168.137.48/track`
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  WEBVIEW DECODER HTML
