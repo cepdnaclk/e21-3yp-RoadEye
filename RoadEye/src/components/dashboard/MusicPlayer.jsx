@@ -11,7 +11,6 @@ import { WebView } from 'react-native-webview'
 import HelmetUDP from '../../utils/HelmetUDP'
 
 // ── Patch HelmetUDP with audio sender ────────────────────────────────────────
-// ── Patch HelmetUDP with audio sender ────────────────────────────────────────
 if (!HelmetUDP.sendAudio) {
   HelmetUDP.sendAudio = function (pcmChunk) {
     // Bypass _enqueue entirely — it silently pushes to _queue when _ready is
@@ -26,13 +25,26 @@ if (!HelmetUDP.sendAudio) {
     }
 
     const frameId = this._nextFrameId()
+
+    // FIX (bug 2): byte[4] was hardcoded to 1 — a leftover from an older
+    // protocol draft.  PCLink.h treats byte[4] as reserved and expects 0.
+    // A non-zero value caused the parser to misinterpret or misroute the
+    // packet on some firmware builds.
+    //
+    // Header layout (must match PCLink.h exactly):
+    //   [0]  0x02          PKT_AUDIO type
+    //   [1]  frameId low   sequence number (low byte)
+    //   [2]  frameId high  sequence number (high byte)
+    //   [3]  0x00          reserved
+    //   [4]  0x00          reserved  ← was 1, now correctly 0
+    //   [5]  payloadLen    length of PCM data that follows
     const payload = [
       0x02,
       frameId & 0xFF,
       (frameId >> 8) & 0xFF,
       0,
-      1,
-      pcmChunk.length,  // safe: CHUNK_SIZE=240 fits in uint8 (<= 250)
+      0,              // FIX: was 1, must be 0 (reserved byte)
+      pcmChunk.length,
       ...pcmChunk,
     ]
 
@@ -52,30 +64,25 @@ if (!HelmetUDP.sendAudio) {
 // ─────────────────────────────────────────────────────────────────────────────
 const TARGET_SAMPLE_RATE = 22050
 
-// FIX: was 480.  Two separate bugs made that value fatal:
+// FIX (bug 1): CHUNK_SIZE was 240, which exceeds MAX_CHUNK_PAYLOAD = 220
+// defined in PCLinkConstants.js (and mirrored in PCLink.h).
 //
-//   Bug 1 — payloadLen overflow
-//     In sendAudio(), pcmChunk.length is written into header byte[5] which is
-//     a uint8 (0-255).  480 & 0xFF = 224, so the ESP32 reads payloadLen=224
-//     and slices only 224 bytes.  The remaining 256 bytes corrupt the next
-//     packet header, causing "Malformed packet" errors and completely silent
-//     audio on the helmet.
+// PCLink.cpp guards every incoming audio packet with:
+//   if (payloadLen > MAX_CHUNK_PAYLOAD) return;   // MAX_CHUNK_PAYLOAD = 220
 //
-//   Bug 2 — MAX_CHUNK_PAYLOAD guard in PCLink
-//     Even if payloadLen weren't truncated, _sendSmall() on the ESP32 has:
-//       if (payloadLen > MAX_CHUNK_PAYLOAD) return;   // MAX_CHUNK_PAYLOAD = 250
-//     480 > 250, so every audio packet was silently dropped before the
-//     audio callback was ever reached.
+// Since 240 > 220, every single audio packet was silently dropped on the
+// ESP32 before onAudioChunk was ever called.  The phone reported "streaming"
+// because UDP send() succeeded — but the ESP32 discarded every packet.
 //
-//   Fix: 240 samples per chunk.
-//     240 < 256 (fits in uint8 with no truncation)
-//     240 < 250 (passes the MAX_CHUNK_PAYLOAD guard in PCLink)
-//     240 / 22050 ≈ 10.9 ms per chunk — still fine for real-time streaming.
-const CHUNK_SIZE         = 240
-const MS_PER_CHUNK       = (CHUNK_SIZE / TARGET_SAMPLE_RATE) * 1000
-const SEND_HEADROOM_MS   = 2
+// Fix: 200 samples per chunk.
+//   200 < 220  → passes the MAX_CHUNK_PAYLOAD guard in PCLink
+//   200 < 256  → fits in header byte[5] (uint8) with no truncation
+//   200 / 22050 ≈ 9.07 ms per chunk — still fine for real-time streaming
+const CHUNK_SIZE       = 200
+const MS_PER_CHUNK     = (CHUNK_SIZE / TARGET_SAMPLE_RATE) * 1000
+const SEND_HEADROOM_MS = 2
 
-const ESP32_URL = `http://192.168.137.210/track`
+import { getESP32IP } from '../../utils/ESP32Discovery'
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  WEBVIEW DECODER HTML
@@ -89,7 +96,7 @@ const ESP32_URL = `http://192.168.137.210/track`
 //    →  resample to 22050 Hz  →  convert to uint8 (128=silence)
 //    →  post chunks back to React Native
 //
-//  RN → WebView:  { type:'decode', b64:'...', targetSR:22050, chunkSize:240 }
+//  RN → WebView:  { type:'decode', b64:'...', targetSR:22050, chunkSize:200 }
 //  WebView → RN:  { type:'ready' }
 //                 { type:'info',  sr, ch, dur }
 //                 { type:'chunk', data:[0..255,...] }
@@ -206,8 +213,10 @@ export default function MusicPlayer() {
   }, [hasPermission])
 
   const sendTrackToESP32 = async (track, art) => {
+    const ip = getESP32IP()
+    if (!ip) return
     try {
-      await fetch(ESP32_URL, {
+      await fetch(`http://${ip}/track`, {   // ✅ dynamic IP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ track: track ?? '', artist: art ?? '' }),
