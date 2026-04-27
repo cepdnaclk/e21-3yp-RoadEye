@@ -295,22 +295,86 @@ Tested with real users (motorcycle riders):
 
 ## Detailed budget
 
-All items and costs
+All items and associated costs for the RoadEye system are summarized below.
 
-| Item          | Quantity  | Unit Cost  | Total  |
-| ------------- |:---------:|:----------:|-------:|
-| Sample item   | 5         | 10 LKR     | 50 LKR |
+| Item                                      | Quantity | Unit Cost (LKR) | Total (LKR) |
+|-------------------------------------------|:--------:|:---------------:|------------:|
+| Jumper Wire M/M 20cm                      | 3        | 190             | 570         |
+| Jumper Wire F/F 20cm                      | 2        | 185             | 370         |
+| Jumper Wire M/F 20cm                      | 1        | 190             | 190         |
+| 1.8" TFT LCD Display                      | 1        | 1490            | 1490        |
+| 2.0" TFT Color Screen                     | 1        | 2790            | 2790        |
+| Digital Touch Sensor                      | 1        | 160             | 160         |
+| Neodymium Magnets (5x2)                   | 5        | 60              | 300         |
+| MPU-9250 9-Axis IMU                       | 1        | 1190            | 1190        |
+| Hall Sensor Module                        | 1        | 260             | 260         |
+| 12V 2A Power Supply                       | 1        | 790             | 790         |
+| Waterproof Ultrasonic Sensor              | 1        | 1890            | 1890        |
+| Ultrasonic Waterproof Sensor (5140)       | 1        | 490             | 490         |
+| MAX98357 Audio Amplifier                  | 1        | 540             | 540         |
+| Green Dot Board (7x9)                     | 1        | 160             | 160         |
+| Female Pin Header                         | 5        | 40              | 200         |
+| Vibration Motor Module                    | 1        | 250             | 250         |
+| LED (5mm, Diffused)                       | 2        | 5               | 10          |
+| INMP441 Microphone                        | 1        | 890             | 890         |
+| Filament Roll (Black, 1kg)                | 1        | 4950            | 4950        |
+| Acrylic Board                             | 1        | 600             | 600         |
+
+---
 
 ## Conclusion
 
-What was achieved, future developments, commercialization plans
+### 🎯 What Was Achieved
 
-## Links
+The RoadEye system successfully demonstrates a complete smart motorcycle safety solution by integrating multiple hardware and software components into a unified platform.
 
-- [Project Repository](https://github.com/cepdnaclk/{{ page.repository-name }}){:target="_blank"}
-- [Project Page](https://cepdnaclk.github.io/{{ page.repository-name}}){:target="_blank"}
-- [Department of Computer Engineering](http://www.ce.pdn.ac.lk/)
-- [University of Peradeniya](https://eng.pdn.ac.lk/)
+**Key achievements include:**
+- Development of a fully functional smart helmet system  
+- Successful integration of:
+  - Helmet-based alert mechanisms  
+  - Bike-mounted sensor module  
+  - Mobile application for intelligence and analytics  
+
+**System capabilities:**
+- Real-time collision warning system  
+- Reliable crash detection with emergency alert functionality  
+- Minimal rider distraction through optimized human–machine interaction  
+
+
+### 🔮 Future Developments
+
+Several enhancements can further improve the system:
+
+- AI-based predictive risk analysis  
+- Camera-based blind spot detection  
+- Helmet-to-helmet communication  
+- Integration with smart traffic infrastructure  
+- Voice assistant for hands-free control  
+
+
+### 💼 Commercialization Plan
+
+**Target Users:**
+- Delivery riders  
+- Daily commuters  
+
+**Product Variants:**
+- **Basic Version:** Core safety alerts  
+- **Advanced Version:** Full analytics + HUD features  
+
+**Go-to-Market Strategy:**
+- Partner with helmet manufacturers  
+- Offer as an aftermarket add-on device
+
+---
+
+
+## 🔗 Links
+
+- 🔹 [Project Repository](https://github.com/cepdnaclk/e21-3yp-RoadEye)  
+- 🔹 [Live Project Page](https://cepdnaclk.github.io/e21-3yp-RoadEye/)  
+- 🔹 [Department of Computer Engineering](http://www.ce.pdn.ac.lk/)  
+- 🔹 [University of Peradeniya](https://eng.pdn.ac.lk/)   
 
 [//]: # (Please refer this to learn more about Markdown syntax)
 [//]: # (https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet)
