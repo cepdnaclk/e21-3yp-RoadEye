@@ -49,14 +49,169 @@ intelligent design and embedded safety features, the proposed smart helmet seeks
 reduce accident risk, improve riding awareness, and create a safer and more intuitive 
 riding experience.
 
+---
 
 ## Solution Architecture
 
-High level diagram + description
+<p align="center">
+  <img src="/docs/images/system-flow-chart2.png" width="600">
+</p>
+
+### Description
+
+The RoadEye system follows a distributed smart system architecture with three main components:
+
+1. Helmet Unit (User Interface Layer)
+- Acts as the primary interaction interface
+- Displays alerts using HUD
+- Provides audio + haptic feedback
+- Processes real-time alerts from Bike Module
+  
+2. Bike Module (Sensing & Detection Layer)
+- Core data acquisition unit
+- Collects environmental and motion data
+- Performs edge-level processing
+- Sends processed alerts to Helmet
+  
+3. Mobile Application (Intelligence Layer)
+- Performs high-level processing & analytics
+- Stores ride history
+- Handles user preferences & emergency communication
+  
+Data Flow
+- Sensors → Bike Module
+- Bike Module → Helmet (real-time alerts)
+- Helmet ↔ Mobile App (data sync, configuration)
+- Crash event → Mobile App → Emergency contacts
+
+---
+
+
 
 ## Hardware and Software Designs
 
-Detailed designs with many sub-sections
+### 🧱 Hardware Design
+
+#### 🔹 1. Helmet Unit Hardware
+
+**a) Processing Unit**
+- Microcontroller (ESP32 / similar)  
+- Handles:
+  - Sensor input  
+  - Communication  
+  - Alert generation  
+
+**b) Display System (HUD)**
+- Fresnel lens  
+- Reflective combiner  
+- Micro-display  
+
+**Purpose:**
+- Create a virtual distant image  
+- Reduce eye strain  
+
+**c) Audio System**
+- Stereo speakers inside padding  
+- Noise-optimized output  
+
+**d) Haptic Feedback System**
+- Small vibration motors near ears  
+
+**Used for:**
+- Collision alerts  
+- Warnings without visual overload  
+
+**e) Sensors**
+- 9-Axis IMU → head motion & crash detection  
+- Hall Effect Sensor → buckle detection  
+- Capacitive Sensor → helmet wear detection  
+
+**f) Power System**
+- LiPo battery  
+- Charging module (USB-C)  
+- Voltage regulation  
+
+
+
+#### 🔹 2. Bike Module Hardware
+
+**a) Processing Unit**
+- ESP32 / similar microcontroller  
+
+**b) Distance Sensors**
+- Ultrasonic / ToF sensors (rear + sides)  
+
+**Purpose:**
+- Detect vehicles approaching from behind  
+
+**c) Environmental Sensors**
+- Temperature  
+- Humidity  
+- Pressure  
+- Light sensor  
+
+**d) Motion Sensors**
+- 9-Axis IMU → tilt, crash, braking  
+- Vibration sensor → road condition  
+
+**e) Anti-Theft System**
+- Detects movement when parked  
+- Sends alert to mobile  
+
+
+
+#### 🔹 3. Communication
+- WiFi-based communication  
+- Optional Bluetooth pairing for authentication  
+
+
+### 💻 Software Design
+
+#### 🔹 1. Embedded Software (Helmet & Bike)
+
+**a) Sensor Data Processing**
+- Filtering (noise reduction)  
+- Threshold-based detection  
+- Event triggering  
+
+**b) Alert System Logic**
+- Priority-based alerts:
+  - Crash  
+  - Collision risk  
+  - Weather warning  
+  - Notifications  
+
+**c) Power Management**
+- Sleep modes  
+- Sensor duty cycling  
+
+
+
+#### 🔹 2. Mobile Application
+
+**a) Frontend**
+- Dashboard (speed, alerts, environment)  
+- Ride analytics UI  
+- Notifications panel  
+
+**b) Backend Logic**
+- Data processing  
+- Ride analysis  
+- Risk scoring  
+
+**c) Emergency System**
+- Auto SMS/call during crash  
+- Location sharing  
+
+**d) OTA Updates**
+- Firmware updates via app  
+
+
+
+#### 🔹 3. Data Flow Design
+- Real-time data → Helmet alerts  
+- Logged data → Mobile app storage  
+- Processed data → Analytics dashboard  
 
 ## Testing
 
