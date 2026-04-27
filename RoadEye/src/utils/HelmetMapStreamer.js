@@ -3,19 +3,19 @@
 import HelmetUDP from './HelmetUDP'
 
 // ─── Tuning ──────────────────────────────────────────────────────────────────
-const TARGET_FPS      = 5      // 200ms interval — gives JPEGDEC time to decode
-const DIFF_THRESHOLD  = 20     // per-channel delta to count a pixel as changed
-const DIFF_MIN_PIXELS = 80     // min changed pixels before sending a frame
-const JPEG_QUALITY    = 0.92   // near-lossless — eliminate blocking artifacts
-const MAP_W           = 120    // must match SecondDisplay MAP_W
-const MAP_H           = 120    // must match SecondDisplay MAP_H
+const TARGET_FPS      = 5
+const DIFF_THRESHOLD  = 20
+const DIFF_MIN_PIXELS = 80
+const JPEG_QUALITY    = 0.92
+const MAP_W           = 120
+const MAP_H           = 120
 // ─────────────────────────────────────────────────────────────────────────────
 
 let _inject     = null
 let _timer      = null
 let _active     = false
 let _paused     = false
-let _prevPixels = null
+let _prevB64    = null   // ← store previous base64 for string-level diff
 let _waiting    = false
 
 const HelmetMapStreamer = {
@@ -26,11 +26,11 @@ const HelmetMapStreamer = {
       console.warn('[MapStreamer] start() needs an inject function')
       return
     }
-    _inject     = injectFn
-    _active     = true
-    _paused     = false
-    _prevPixels = null
-    _waiting    = false
+    _inject  = injectFn
+    _active  = true
+    _paused  = false
+    _prevB64 = null
+    _waiting = false
     console.log('[MapStreamer] started')
     _scheduleNext()
   },
@@ -63,8 +63,8 @@ const HelmetMapStreamer = {
     _paused  = false
     _waiting = false
     if (_timer) { clearTimeout(_timer); _timer = null }
-    _prevPixels = null
-    _inject     = null
+    _prevB64 = null
+    _inject  = null
     console.log('[MapStreamer] stopped')
   },
 
@@ -96,10 +96,6 @@ function _requestFrame() {
   if (_waiting)             { _scheduleNext(); return }
 
   _waiting = true
-  const quality = JPEG_QUALITY
-  const mapW    = MAP_W
-  const mapH    = MAP_H
-
   setTimeout(() => { _waiting = false }, 1500)
 
   _inject(`
@@ -112,8 +108,8 @@ function _requestFrame() {
         }
 
         var out = document.createElement('canvas');
-        out.width  = ${mapW};
-        out.height = ${mapH};
+        out.width  = ${MAP_W};
+        out.height = ${MAP_H};
         var ctx = out.getContext('2d');
 
         var rect = mapEl.getBoundingClientRect();
@@ -122,15 +118,12 @@ function _requestFrame() {
           return;
         }
 
-        var sx = ${mapW} / rect.width;
-        var sy = ${mapH} / rect.height;
+        var sx = ${MAP_W} / rect.width;
+        var sy = ${MAP_H} / rect.height;
 
-        // ── 1. Black background ───────────────────────────────────────────
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, ${mapW}, ${mapH});
+        ctx.fillRect(0, 0, ${MAP_W}, ${MAP_H});
 
-        // ── 2. Dark map tiles at full opacity ─────────────────────────────
-        // CartoCDN dark_all tiles already have black background + grey roads
         var tiles = mapEl.querySelectorAll('.leaflet-tile');
         tiles.forEach(function(img) {
           try {
@@ -142,10 +135,6 @@ function _requestFrame() {
           } catch(e) {}
         });
 
-        // ── 3. Route line — drawn SYNCHRONOUSLY from SVG path data ───────
-        // The async blob/Image approach misses the frame because toDataURL()
-        // runs before img.onload fires. Instead we read the SVG <path>
-        // elements directly and replay them onto the canvas with Path2D.
         var svgOverlays = mapEl.querySelectorAll('.leaflet-overlay-pane svg');
         svgOverlays.forEach(function(svgEl) {
           try {
@@ -153,29 +142,22 @@ function _requestFrame() {
             var svgH = parseFloat(svgEl.getAttribute('height')) || svgEl.getBoundingClientRect().height;
             var svgR = svgEl.getBoundingClientRect();
 
-            // Offset of SVG origin relative to map div, scaled to canvas px
             var ox = (svgR.left - rect.left) * sx;
             var oy = (svgR.top  - rect.top)  * sy;
-
-            // How much to scale SVG internal coords to canvas coords
-            var kx = (${mapW} / rect.width)  * (svgR.width  / svgW);
-            var ky = (${mapH} / rect.height) * (svgR.height / svgH);
+            var kx = (${MAP_W} / rect.width)  * (svgR.width  / svgW);
+            var ky = (${MAP_H} / rect.height) * (svgR.height / svgH);
 
             var paths = svgEl.querySelectorAll('path');
             paths.forEach(function(pathEl) {
               var d = pathEl.getAttribute('d');
               if (!d || d.length < 4) return;
-
-              // Skip filled shapes (destination pin circles etc.)
               var fill = pathEl.getAttribute('fill') || '';
               if (fill && fill !== 'none') return;
-
               try {
                 var p2d = new Path2D(d);
                 ctx.save();
                 ctx.translate(ox, oy);
                 ctx.scale(kx, ky);
-                // White route line, thick enough to be visible at 120px
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth   = 4 / Math.min(kx, ky);
                 ctx.lineCap     = 'round';
@@ -188,32 +170,28 @@ function _requestFrame() {
           } catch(e) {}
         });
 
-        // Fallback: canvas renderer (some Leaflet configs use this)
         var canvasOverlays = mapEl.querySelectorAll('.leaflet-overlay-pane canvas');
         canvasOverlays.forEach(function(el) {
           try {
             ctx.save();
             ctx.globalCompositeOperation = 'screen';
-            ctx.drawImage(el, 0, 0, ${mapW}, ${mapH});
+            ctx.drawImage(el, 0, 0, ${MAP_W}, ${MAP_H});
             ctx.restore();
           } catch(e) {}
         });
 
-        // ── 4. User position dot — bright cyan ────────────────────────────
         if (typeof userLat !== 'undefined' && userLat !== null && typeof map !== 'undefined') {
           try {
             var pt = map.latLngToContainerPoint([userLat, userLng]);
-            var px = (pt.x / rect.width)  * ${mapW};
-            var py = (pt.y / rect.height) * ${mapH};
+            var px = (pt.x / rect.width)  * ${MAP_W};
+            var py = (pt.y / rect.height) * ${MAP_H};
 
-            // Glow ring
             ctx.beginPath();
             ctx.arc(px, py, 8, 0, Math.PI * 2);
             ctx.strokeStyle = 'rgba(0, 255, 200, 0.35)';
             ctx.lineWidth   = 3;
             ctx.stroke();
 
-            // Solid dot
             ctx.beginPath();
             ctx.arc(px, py, 4, 0, Math.PI * 2);
             ctx.fillStyle   = '#00ffc8';
@@ -224,7 +202,7 @@ function _requestFrame() {
           } catch(e) {}
         }
 
-        var dataUrl = out.toDataURL('image/jpeg', ${quality});
+        var dataUrl = out.toDataURL('image/jpeg', ${JPEG_QUALITY});
         var b64 = dataUrl.indexOf(',') >= 0 ? dataUrl.split(',')[1] : dataUrl;
         window.ReactNativeWebView.postMessage(JSON.stringify({type:'__mapFrame', b64: b64}));
       } catch(e) {
@@ -237,42 +215,42 @@ function _requestFrame() {
 }
 
 async function _processFrame(base64) {
+  // Convert base64 → raw JPEG bytes
   const binary    = atob(base64)
   const jpegBytes = new Uint8Array(binary.length)
   for (let i = 0; i < binary.length; i++) jpegBytes[i] = binary.charCodeAt(i)
 
-  let pixels
-  try {
-    const blob   = new Blob([jpegBytes], { type: 'image/jpeg' })
-    const bitmap = await createImageBitmap(blob)
-    const oc     = new OffscreenCanvas(MAP_W, MAP_H)
-    const ctx    = oc.getContext('2d')
-    ctx.drawImage(bitmap, 0, 0, MAP_W, MAP_H)
-    pixels = ctx.getImageData(0, 0, MAP_W, MAP_H).data
-  } catch (err) {
-    console.log('[MapStreamer] no OffscreenCanvas, sending raw frame')
-    HelmetUDP.sendJpeg(jpegBytes)
-    return
+  // ── Diff check ────────────────────────────────────────────────────────────
+  // OffscreenCanvas is not available in React Native, so we diff the base64
+  // string directly. This is not pixel-perfect but catches identical frames
+  // (user stopped, map hasn't panned) and skips them cheaply.
+  if (_prevB64 !== null) {
+    const changed = _b64ChangedRatio(base64, _prevB64)
+    console.log(`[MapStreamer] frame diff ratio: ${(changed * 100).toFixed(1)}%`)
+
+    // DIFF_MIN_PIXELS / total pixels converted to a ratio threshold
+    const threshold = DIFF_MIN_PIXELS / (MAP_W * MAP_H)
+    if (changed < threshold) {
+      console.log('[MapStreamer] frame unchanged — skipped')
+      return
+    }
   }
 
-  const changed = _countChangedPixels(pixels)
-  console.log(`[MapStreamer] changed: ${changed} / ${MAP_W * MAP_H}`)
-  if (changed < DIFF_MIN_PIXELS) return
-
-  _prevPixels = new Uint8Array(pixels)
-  console.log(`[MapStreamer] sent frame ${jpegBytes.length}B`)
+  _prevB64 = base64
+  console.log(`[MapStreamer] sending frame ${jpegBytes.length}B`)
   HelmetUDP.sendJpeg(jpegBytes)
 }
 
-function _countChangedPixels(newPixels) {
-  if (!_prevPixels || _prevPixels.length !== newPixels.length) return Infinity
-  let count = 0
-  for (let i = 0; i < newPixels.length; i += 4) {
-    if (
-      Math.abs(newPixels[i]   - _prevPixels[i])   > DIFF_THRESHOLD ||
-      Math.abs(newPixels[i+1] - _prevPixels[i+1]) > DIFF_THRESHOLD ||
-      Math.abs(newPixels[i+2] - _prevPixels[i+2]) > DIFF_THRESHOLD
-    ) count++
+// ─── Fast base64 string diff ──────────────────────────────────────────────────
+// Samples every 4th base64 character (each char = 6 bits ≈ covers ~3 pixels
+// per 4-char group). Returns fraction of sampled chars that differ (0.0–1.0).
+function _b64ChangedRatio(a, b) {
+  if (a.length !== b.length) return 1.0   // different size = definitely changed
+  let diff  = 0
+  let total = 0
+  for (let i = 0; i < a.length; i += 4) {
+    if (a[i] !== b[i]) diff++
+    total++
   }
-  return count
+  return total === 0 ? 1.0 : diff / total
 }

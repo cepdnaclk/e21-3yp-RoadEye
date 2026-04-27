@@ -48,7 +48,7 @@ export const WeatherIcon = {
 }
 
 const HEADER_LEN        = 6
-const MAX_CHUNK_PAYLOAD = 250
+const MAX_CHUNK_PAYLOAD = 220
 const WEAR_LABELS       = { 0: 'ACTIVE', 1: 'IDLE', 2: 'SLEEPING' }
 const LISTEN_PORT       = 4210
 

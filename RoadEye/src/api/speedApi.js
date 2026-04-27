@@ -57,6 +57,12 @@ function wmoToWeatherIcon(code) {
 //   startWeather   (1/2/3)    — mapped from data.startWmoCode
 //   destWeather    (1/2/3)    — mapped from data.destWmoCode
 export async function sendSpeedEvent(data, token) {
+  // ── Skip if no token — speeds won't be saved without auth ──────────────────
+  if (!token) {
+    console.warn('[speedApi] ⚠️ No auth token — speed event skipped')
+    return null
+  }
+
   // ── Pull live navigation context ──────────────────────────────────────────
   const navState = getNavState()
 
