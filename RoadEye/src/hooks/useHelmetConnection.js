@@ -125,9 +125,11 @@ export function useHelmetConnection() {
     HelmetUDP.onSensor = (sensor) => {
       sensorRef.current = sensor
       publishData({
-        ...sensorRef.current,
         ...imuRef.current,
-        speed:          sensor.forwardAccel ? Math.abs(sensor.forwardAccel * 10).toFixed(1) : 0,
+        ...sensorRef.current,
+      
+        // speed:          sensor.forwardAccel ? Math.abs(sensor.forwardAccel * 10).toFixed(1) : 0,
+        speed: sensor.speed || 0,
         accel:          sensor.forwardAccel,
         stability:      Math.max(0, Math.min(100, Math.round(100 - Math.abs(sensor.roll || 0)))),
         brakingCount:   sensor.forwardAccel < -0.6 ? 1 : 0,
