@@ -82,7 +82,7 @@ const CHUNK_SIZE       = 200
 const MS_PER_CHUNK     = (CHUNK_SIZE / TARGET_SAMPLE_RATE) * 1000
 const SEND_HEADROOM_MS = 2
 
-const ESP32_URL = `esp32.local/track`
+import { getESP32IP } from '../../utils/ESP32Discovery'
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  WEBVIEW DECODER HTML
@@ -213,8 +213,10 @@ export default function MusicPlayer() {
   }, [hasPermission])
 
   const sendTrackToESP32 = async (track, art) => {
+    const ip = getESP32IP()
+    if (!ip) return
     try {
-      await fetch(ESP32_URL, {
+      await fetch(`http://${ip}/track`, {   // ✅ dynamic IP
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ track: track ?? '', artist: art ?? '' }),
