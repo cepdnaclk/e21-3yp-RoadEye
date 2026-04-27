@@ -21,7 +21,7 @@ import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 
-const ESP32_IP = 'esp32.local'
+import { getESP32IP } from '../utils/ESP32Discovery'
 
 // ── Auth — replace with your actual auth context / store ─────────────────────
 // These are placeholders; swap in however you retrieve userId and token.
@@ -348,7 +348,12 @@ export default function NavigationScreen({ navigation }) {
           if (helmetConnected) {
             sendHelmetDisconnected()
           } else {
-            sendHelmetConnected(ESP32_IP)
+            const ip = getESP32IP()
+            if (!ip) {
+              Alert.alert('Scanning...', 'ESP32 not found yet. Make sure helmet is on and on the same WiFi.')
+              return
+            }
+            sendHelmetConnected(ip)   // ✅ only connects when IP is known
           }
         }}
       >

@@ -25,8 +25,7 @@ export function useHelmetConnection() {
   const [error, setError]                     = useState(null)
   const [signal, setSignal]                   = useState(0)
   const [log, setLog]                         = useState([])
-  const [helmetIp, setHelmetIp]               = useState('esp32.local')
-
+  const [helmetIp, setHelmetIp]               = useState('')
   const mountedRef         = useRef(true)
   const reconnectCount     = useRef(0)
   const connectTimeoutRef  = useRef(null)
@@ -36,7 +35,7 @@ export function useHelmetConnection() {
   const sensorRef          = useRef({})
   const imuRef             = useRef({})
   const connectionStateRef = useRef(HELMET_STATE.DISCONNECTED)
-  const helmetIpRef        = useRef('esp32.local')
+  const helmetIpRef        = useRef('')
 
   // Keep refs in sync — never put these in dep arrays
   useEffect(() => { connectionStateRef.current = connectionState }, [connectionState])
