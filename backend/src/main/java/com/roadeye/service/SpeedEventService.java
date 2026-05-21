@@ -41,7 +41,7 @@ public class SpeedEventService {
                 .eventTime(LocalDateTime.now())
                 .build();
 
-        speedRepo.save(event);
+        return speedRepo.save(event);
     }
 
     /**
