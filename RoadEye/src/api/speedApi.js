@@ -2,7 +2,10 @@
 
 const BASE_URL = "http://YOUR-IP:8080/api"
 
-// 🔹 Send speed event
+/**
+ * Send a speed reading to the backend.
+ * Returns { id, speed, eventTime } so dashboard can show confirmed speed.
+ */
 export async function sendSpeedEvent(data, token) {
   try {
     const res = await fetch(`${BASE_URL}/speed/event`, {
@@ -22,12 +25,19 @@ export async function sendSpeedEvent(data, token) {
 
     const result = await res.json()
     console.log("✅ Speed saved:", result)
+    return result // returns { id, speed, eventTime }
+
   } catch (err) {
     console.error("❌ Speed send error:", err)
+    return null
   }
 }
 
-// 🔹 Get today's speeds (for chart)
+/**
+ * Get the latest confirmed speed from backend.
+ * Called on dashboard mount to show last known speed before helmet connects.
+ */
+// Get today's speeds (for chart)
 export async function getTodaySpeed(userId, token) {
   try {
     const res = await fetch(`${BASE_URL}/speed/today/${userId}`, {
@@ -36,10 +46,28 @@ export async function getTodaySpeed(userId, token) {
       },
     })
 
-    if (!res.ok) {
-      throw new Error("Failed to fetch speed data")
-    }
+    if (!res.ok) return null
+    // {
+    //   throw new Error("Failed to fetch speed data")
+    // }
 
+    return await res.json() // { speed, eventTime }
+  } catch (err) {
+    console.error("❌ Fetch speed error:", err)
+    // return []
+    return null
+  }
+}
+
+/**
+ * Get today's speed readings for the chart.
+ */
+export async function getTodaySpeed(userId, token) {
+  try {
+    const res = await fetch(`${BASE_URL}/speed/today/${userId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) throw new Error("Failed to fetch speed data")
     return await res.json()
   } catch (err) {
     console.error("❌ Fetch speed error:", err)
