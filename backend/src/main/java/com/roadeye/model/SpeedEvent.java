@@ -8,6 +8,7 @@ import java.util.UUID;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
+@Table(name = "speed_event")
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,7 +16,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 public class SpeedEvent {
 
     @Id
-    @GeneratedValue
+    @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     // @ManyToOne
@@ -30,5 +31,15 @@ public class SpeedEvent {
     private Double latitude;
     private Double longitude;
 
+    @Column(name = "event_time")
     private LocalDateTime eventTime;
+
+    @PrePersist
+    public void onCreate() {
+        if (this.eventTime == null) {
+            this.eventTime = LocalDateTime.now();
+        }
+    }
+
+    //private LocalDateTime eventTime;
 }
