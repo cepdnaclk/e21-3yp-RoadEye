@@ -22,7 +22,17 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
     if (helmet.helmetData) onHelmetData?.(helmet.helmetData)
   }, [helmet.helmetData, onHelmetData])
 
-  const initial = (user?.username?.[0] || 'H').toUpperCase()
+  const username = user?.username || 'User'
+  const initial = (username?.[0] || 'U').toUpperCase()
+
+  const today = new Date()
+  const dateText = today
+    .toLocaleDateString('en-US', {
+      weekday: 'short',
+      day: '2-digit',
+      month: 'short',
+    })
+    .toUpperCase()
 
   const handleLogout = () => {
     setDropdown(false)
@@ -35,12 +45,20 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
     <View style={styles.container}>
       <View style={styles.topRow}>
         <View>
-          <Text style={styles.greeting}>Hi {user?.username || 'Hirushi'},</Text>
-          <Text style={styles.date}>TUES 11 FEB</Text>
+          <Text style={styles.greeting}>Hi {username},</Text>
+          <Text style={styles.date}>{dateText}</Text>
         </View>
+
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.iconBtn}><Text style={styles.iconText}>🔔</Text></TouchableOpacity>
-          <TouchableOpacity onPress={() => setDropdown(true)} style={styles.avatar} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.iconBtn}>
+            <Text style={styles.iconText}>🔔</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => setDropdown(true)}
+            style={styles.avatar}
+            activeOpacity={0.8}
+          >
             <Text style={styles.avatarText}>{initial}</Text>
           </TouchableOpacity>
         </View>
@@ -52,13 +70,18 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
         <Pressable style={styles.backdrop} onPress={() => setDropdown(false)}>
           <Pressable style={styles.menu} onPress={e => e.stopPropagation()}>
             <View style={styles.menuHeader}>
-              <View style={styles.menuAvatar}><Text style={styles.menuAvatarText}>{initial}</Text></View>
+              <View style={styles.menuAvatar}>
+                <Text style={styles.menuAvatarText}>{initial}</Text>
+              </View>
+
               <View>
-                <Text style={styles.menuName}>{user?.username || 'Hirushi'}</Text>
+                <Text style={styles.menuName}>{username}</Text>
                 <Text style={styles.menuEmail}>{user?.email || ''}</Text>
               </View>
             </View>
+
             <View style={styles.divider} />
+
             <TouchableOpacity
               style={styles.menuItem}
               activeOpacity={0.7}
@@ -71,12 +94,19 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
               <Text style={styles.menuItemText}>Change Profile</Text>
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
+
             <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-              <Text style={styles.menuItemIcon}>⚙️</Text><Text style={styles.menuItemText}>Settings</Text><Text style={styles.menuArrow}>›</Text>
+              <Text style={styles.menuItemIcon}>⚙️</Text>
+              <Text style={styles.menuItemText}>Settings</Text>
+              <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
+
             <View style={styles.divider} />
+
             <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
-              <Text style={styles.menuItemIcon}>🚪</Text><Text style={[styles.menuItemText, { color: '#DC2626' }]}>Log Out</Text><Text style={[styles.menuArrow, { color: '#DC2626' }]}>›</Text>
+              <Text style={styles.menuItemIcon}>🚪</Text>
+              <Text style={[styles.menuItemText, { color: '#DC2626' }]}>Log Out</Text>
+              <Text style={[styles.menuArrow, { color: '#DC2626' }]}>›</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -91,7 +121,8 @@ const styles = StyleSheet.create({
   greeting:{ fontSize:22, fontWeight:'800', color:C.text },
   date:{ fontSize:11, color:C.muted, fontWeight:'500', letterSpacing:1 },
   actions:{ flexDirection:'row', alignItems:'center', gap:14 },
-  iconBtn:{ padding:2 }, iconText:{ fontSize:18 },
+  iconBtn:{ padding:2 },
+  iconText:{ fontSize:18 },
   avatar:{ width:36, height:36, borderRadius:18, backgroundColor:'#f97316', alignItems:'center', justifyContent:'center' },
   avatarText:{ color:'#fff', fontWeight:'800', fontSize:14 },
   backdrop:{ flex:1, backgroundColor:'rgba(0,0,0,0.35)' },
