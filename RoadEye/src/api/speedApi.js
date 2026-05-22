@@ -1,6 +1,6 @@
 // src/api/speedApi.js
 
-const BASE_URL = "http://YOUR-IP:8080/api"
+const BASE_URL = "http://10.30.12.231:8080/api"
 
 /**
  * Send a speed reading to the backend.
@@ -33,31 +33,6 @@ export async function sendSpeedEvent(data, token) {
   }
 }
 
-/**
- * Get the latest confirmed speed from backend.
- * Called on dashboard mount to show last known speed before helmet connects.
- */
-// Get today's speeds (for chart)
-export async function getTodaySpeed(userId, token) {
-  try {
-    const res = await fetch(`${BASE_URL}/speed/today/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-
-    if (!res.ok) return null
-    // {
-    //   throw new Error("Failed to fetch speed data")
-    // }
-
-    return await res.json() // { speed, eventTime }
-  } catch (err) {
-    console.error("❌ Fetch speed error:", err)
-    // return []
-    return null
-  }
-}
 
 /**
  * Get today's speed readings for the chart.
