@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import { colors } from '../utils/theme'
@@ -7,11 +7,8 @@ import Svg, { Path } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 
-//Imports for speed and tilt
-// import { useEffect, useRef } from 'react'
-import { sendSpeedEvent } from '../api/speedApi'
+import { sendSpeedEvent, getLatestSpeed } from '../api/speedApi'
 import { sendTiltEvent } from '../api/tiltApi'
-import { Alert } from 'react-native'
 
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard     from '../components/dashboard/WeatherCard'
@@ -21,134 +18,147 @@ import BottomNav       from '../components/dashboard/BottomNav'
 
 const C = colors
 
-// ── Static fallback stats (shown before helmet connects) ──────────────────────
-const DEFAULT_WEEK_STATS = [
-  { icon: '🚴', label: 'Stability score',      val: 68,  helmetKey: 'stability' },
-  { icon: '🛑', label: 'Aggressive Brakings',  val: 35,  helmetKey: 'brakingCount' },
-  { icon: '🏍️', label: 'Sudden Accelerations', val: 56,  helmetKey: 'accelCount' },
-  { icon: '↪️', label: 'Sharp turns',           val: 10,  helmetKey: 'sharpTurnCount' },
-]
-
-const highlights = [
-  { label: 'Duration',      value: '11,857',  sub: 'updated 15 min ago', colors: ['#5B47E0','#7B5CF5'], icon: '⏱' },
-  { label: 'Average Speed', value: '40 km/h', sub: 'updated 5s ago',     colors: ['#7B5CF5','#A78BFA'], icon: '🚴' },
-]
-
 export default function DashboardPage() {
   const insets     = useSafeAreaInsets()
   const { logout } = useAuth()
   const navigation = useNavigation()
   const [activeTab, setActiveTab] = useState('overview')
 
-  const lastSentRef = useRef(0)
+  const lastSentRef     = useRef(0)
   const lastTiltSentRef = useRef(0)
 
-  // Replace properly later
+  // ── Replace properly later ────────────────────────────────────────────────
   const userId = "1f84393a-7f45-46c8-9261-cb313fc1dce9"
-  const token = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJoaXJ1YWRpa2FyaTI4QGdtYWlsLmNvbSIsImlhdCI6MTc3NzI2Mzk0NCwiZXhwIjoxNzc3MzUwMzQ0fQ.XdkilkLkpkIW6EJR3LiP3YDd-snarypxmMhBkxRB-vg"
+  const token  = "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJoaXJ1YWRpa2FyaTI4QGdtYWlsLmNvbSIsImlhdCI6MTc3NzI2Mzk0NCwiZXhwIjoxNzc3MzUwMzQ0fQ.XdkilkLkpkIW6EJR3LiP3YDd-snarypxmMhBkxRB-vg"
 
-  // ── Live helmet data state ────────────────────────────────────────────────
-  const [helmetData, setHelmetData]             = useState(null)
-  const [helmetConnected, setHelmetConnected]   = useState(false)
+  // ── State ─────────────────────────────────────────────────────────────────
+  const [helmetData,       setHelmetData]       = useState(null)
+  const [helmetConnected,  setHelmetConnected]  = useState(false)
+  const [confirmedSpeed,   setConfirmedSpeed]   = useState(0)   // ← last speed saved to DB
 
-  // Called by DashboardHeader → HelmetConnectButton whenever new data arrives
   const handleHelmetData = useCallback((data) => {
     if (data) setHelmetData(data)
   }, [])
 
-  // Called by DashboardHeader → HelmetConnectButton on state changes
   const handleConnectionChange = useCallback((state) => {
     setHelmetConnected(state === 'connected')
   }, [])
 
-  // ── Merge live helmet data into weekStats ─────────────────────────────────
-  // If helmet is connected and has a value for a stat's helmetKey, use it.
-  // Otherwise fall back to the static default value.
-  const weekStats = DEFAULT_WEEK_STATS.map(stat => ({
-    ...stat,
-    val: (helmetConnected && helmetData?.[stat.helmetKey] !== undefined)
-      ? helmetData[stat.helmetKey]
-      : stat.val,
-    live: helmetConnected && helmetData?.[stat.helmetKey] !== undefined,
-  }))
-
-  // Live session state
   const navSession = useNavSession()
 
-  // ───────── SPEED SENDING ─────────
+  // ── On mount: load last confirmed speed from backend ─────────────────────
   useEffect(() => {
-      if (!helmetData || !helmetConnected || !userId || !token) return
-
-      const now = Date.now()
-
-      if (now - lastSentRef.current < 5000) return
-
-      lastSentRef.current = now
-
-      const payload = {
-        userId,
-        speed: Number(helmetData.speed) || 0,
-        latitude: helmetData.latitude || 6.9,
-        longitude: helmetData.longitude || 79.8,
+    const fetchLastSpeed = async () => {
+      const result = await getLatestSpeed(userId, token)
+      if (result?.speed !== undefined) {
+        setConfirmedSpeed(result.speed)
       }
+    }
+    fetchLastSpeed()
+  }, [])
 
-      console.log("📡 Sending speed:", payload)
+  // ── Send speed every 5s when helmet is connected ──────────────────────────
+  useEffect(() => {
+    if (!helmetData || !helmetConnected || !userId || !token) return
 
-      sendSpeedEvent(payload, token)
+    const now = Date.now()
+    if (now - lastSentRef.current < 5000) return
+    lastSentRef.current = now
 
-    }, [helmetData, helmetConnected])
+    const payload = {
+      userId,
+      speed:     Number(helmetData.speed) || 0,
+      latitude:  helmetData.latitude  || 6.9,
+      longitude: helmetData.longitude || 79.8,
+    }
 
+    console.log("📡 Sending speed:", payload)
 
-
-    // ───────── TILT DETECTION ─────────
-    useEffect(() => {
-      if (!helmetData || !helmetConnected || !userId || !token) return
-
-      const roll = helmetData.roll || 0
-      const now = Date.now()
-
-      if (Math.abs(roll) <= 21) return
-
-        if (now - lastTiltSentRef.current < 10000) return
-
-        lastTiltSentRef.current = now
-
-        const payload = {
-          userId,
-          tiltAngle: roll,
-          latitude: helmetData.latitude || 6.9,
-          longitude: helmetData.longitude || 79.8,
-        }
-
-        console.log("⚠️ Sending tilt:", payload)
-
-        const sendTilt = async () => {
-        const res = await sendTiltEvent(payload, token)
-
-        if (res?.triggered) {
-          Alert.alert(
-            "⚠️ Dangerous Tilt Detected",
-            `Tilt: ${res.tiltAngle}° (Threshold: ${res.threshold}°)`
-          )
-        }
-      
+    const send = async () => {
+      const result = await sendSpeedEvent(payload, token)
+      // Update confirmed speed from what backend actually saved
+      if (result?.speed !== undefined) {
+        setConfirmedSpeed(result.speed)
       }
-      sendTilt()
-      
+    }
+    send()
 
-    }, [helmetData, helmetConnected, userId, token])
+  }, [helmetData, helmetConnected])
 
+  // ── Tilt detection ────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!helmetData || !helmetConnected || !userId || !token) return
+
+    const roll = helmetData.roll || 0
+    const now  = Date.now()
+
+    if (Math.abs(roll) <= 21) return
+    if (now - lastTiltSentRef.current < 10000) return
+
+    lastTiltSentRef.current = now
+
+    const payload = {
+      userId,
+      tiltAngle: roll,
+      latitude:  helmetData.latitude  || 6.9,
+      longitude: helmetData.longitude || 79.8,
+    }
+
+    console.log("⚠️ Sending tilt:", payload)
+
+    const sendTilt = async () => {
+      const res = await sendTiltEvent(payload, token)
+      if (res?.triggered) {
+        Alert.alert(
+          "⚠️ Dangerous Tilt Detected",
+          `Tilt: ${res.tiltAngle}° (Threshold: ${res.threshold}°)`
+        )
+      }
+    }
+    sendTilt()
+
+  }, [helmetData, helmetConnected, userId, token])
+
+  // ── Live speed display ────────────────────────────────────────────────────
+  // Priority: live helmet → last confirmed from DB → '--'
+  const liveSpeed = helmetConnected && helmetData?.speed !== undefined
+    ? Number(helmetData.speed).toFixed(0)
+    : confirmedSpeed > 0
+      ? Number(confirmedSpeed).toFixed(0)
+      : '--'
+
+  const speedSub = helmetConnected
+    ? 'live from helmet'
+    : confirmedSpeed > 0
+      ? 'last saved'
+      : 'helmet not connected'
+
+  // ── Highlights — now uses real speed ─────────────────────────────────────
+  const highlights = [
+    {
+      label:  'Duration',
+      value:  '11,857',
+      sub:    'updated 15 min ago',
+      colors: ['#5B47E0', '#7B5CF5'],
+      icon:   '⏱',
+    },
+    {
+      label:  'Current Speed',
+      value:  `${liveSpeed} km/h`,
+      sub:    speedSub,
+      colors: ['#7B5CF5', '#A78BFA'],
+      icon:   '🚴',
+    },
+  ]
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {/* DashboardHeader now owns the helmet connect button and bubbles data up */}
       <DashboardHeader
         onLogout={logout}
         onHelmetData={handleHelmetData}
         onConnectionChange={handleConnectionChange}
       />
 
-      {/* ── Live navigation banner ── */}
       {navSession.active && (
         <NavLiveBanner
           session={navSession}
@@ -190,25 +200,7 @@ export default function DashboardPage() {
           ))}
         </View>
 
-        {/* ── This week report — updates live when helmet is connected ── */}
-        <SectionHeader title="This week report" />
-        <View style={styles.grid}>
-          {weekStats.map(s => (
-            <View key={s.label} style={[styles.statCard, s.live && styles.statCardLive]}>
-              <View style={styles.statCardTop}>
-                <Text style={{ fontSize: 16 }}>{s.icon}</Text>
-                {/* Green pulse dot when this value is live from helmet */}
-                {s.live && <View style={styles.liveDot} />}
-              </View>
-              <Text style={styles.statLabel}>{s.label}</Text>
-              <Text style={[styles.statVal, s.live && styles.statValLive]}>{s.val}</Text>
-            </View>
-          ))}
-        </View>
-
         <SectionHeader title="Navigation" />
-
-        {/* Navigation button — changes appearance when active */}
         <TouchableOpacity
           style={[styles.navBtn, navSession.active && styles.navBtnActive]}
           onPress={() => navigation.navigate('Navigation')}
@@ -242,7 +234,6 @@ export default function DashboardPage() {
   )
 }
 
-// ── Live navigation banner ────────────────────────────────────────────────────
 function NavLiveBanner({ session, onResume, onStop }) {
   return (
     <View style={banner.wrap}>
@@ -267,7 +258,6 @@ function NavLiveBanner({ session, onResume, onStop }) {
   )
 }
 
-// ── Pulsing red dot ───────────────────────────────────────────────────────────
 function PulseDot() {
   return (
     <View style={dot.wrap}>
@@ -276,7 +266,6 @@ function PulseDot() {
   )
 }
 
-// ── Section header ────────────────────────────────────────────────────────────
 function SectionHeader({ title }) {
   return (
     <View style={styles.sectionHeader}>
@@ -286,7 +275,6 @@ function SectionHeader({ title }) {
   )
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   screen:            { flex: 1, backgroundColor: C.bg },
   scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
@@ -305,69 +293,32 @@ const styles = StyleSheet.create({
   highlightIcon:     { fontSize: 20 },
   highlightVal:      { fontSize: 22, fontWeight: '800', color: '#fff', marginVertical: 6 },
   highlightSub:      { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
-
-  // Stat cards
-  statCard:          {
-    flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14,
-    padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06, shadowRadius: 4, elevation: 1,
-  },
-  // Subtle green border when showing live data
+  statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   statCardLive:      { borderWidth: 1.5, borderColor: '#4ade80' },
   statCardTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   statLabel:         { fontSize: 11, color: C.muted, fontWeight: '500', marginVertical: 4, lineHeight: 15 },
   statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
-  statValLive:       { color: '#16a34a' },   // green when live
+  statValLive:       { color: '#16a34a' },
   liveDot:           { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-
-  // Nav button
-  navBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16,
-  },
-  navBtnActive: {
-    backgroundColor: '#2a0a0a',
-    borderWidth: 1.5,
-    borderColor: '#ff3b30',
-  },
-  navBtnIcon:  { fontSize: 28 },
-  navBtnTitle: { fontSize: 15, fontWeight: '800', color: '#fff' },
-  navBtnSub:   { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
-  navBtnArrow: { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
+  navBtn:            { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16 },
+  navBtnActive:      { backgroundColor: '#2a0a0a', borderWidth: 1.5, borderColor: '#ff3b30' },
+  navBtnIcon:        { fontSize: 28 },
+  navBtnTitle:       { fontSize: 15, fontWeight: '800', color: '#fff' },
+  navBtnSub:         { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
+  navBtnArrow:       { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
 })
 
 const banner = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1a0505',
-    borderBottomWidth: 1.5, borderBottomColor: '#ff3b30',
-    paddingHorizontal: 16, paddingVertical: 10,
-  },
-  title: { fontSize: 13, fontWeight: '700', color: '#fff' },
-  step:  { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
-  resumeBtn: {
-    backgroundColor: 'rgba(255,59,48,0.15)',
-    borderWidth: 1, borderColor: '#ff3b30',
-    borderRadius: 5, paddingHorizontal: 10, paddingVertical: 5,
-  },
+  wrap:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1a0505', borderBottomWidth: 1.5, borderBottomColor: '#ff3b30', paddingHorizontal: 16, paddingVertical: 10 },
+  title:      { fontSize: 13, fontWeight: '700', color: '#fff' },
+  step:       { fontSize: 11, color: 'rgba(255,255,255,0.55)', marginTop: 1 },
+  resumeBtn:  { backgroundColor: 'rgba(255,59,48,0.15)', borderWidth: 1, borderColor: '#ff3b30', borderRadius: 5, paddingHorizontal: 10, paddingVertical: 5 },
   resumeText: { fontSize: 11, fontWeight: '800', color: '#ff3b30', letterSpacing: 0.8 },
-  stopBtn: {
-    width: 30, height: 30, borderRadius: 5,
-    backgroundColor: '#ff3b30',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  stopText: { fontSize: 13, color: '#fff', fontWeight: '800' },
+  stopBtn:    { width: 30, height: 30, borderRadius: 5, backgroundColor: '#ff3b30', alignItems: 'center', justifyContent: 'center' },
+  stopText:   { fontSize: 13, color: '#fff', fontWeight: '800' },
 })
 
 const dot = StyleSheet.create({
-  wrap: {
-    width: 14, height: 14, borderRadius: 7,
-    backgroundColor: 'rgba(255,59,48,0.25)',
-    alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  },
-  inner: {
-    width: 7, height: 7, borderRadius: 3.5,
-    backgroundColor: '#ff3b30',
-  },
+  wrap:  { width: 14, height: 14, borderRadius: 7, backgroundColor: 'rgba(255,59,48,0.25)', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  inner: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#ff3b30' },
 })
