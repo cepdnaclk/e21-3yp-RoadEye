@@ -1,5 +1,13 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, Modal, Pressable } from 'react-native'
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  Pressable,
+} from 'react-native'
+
 import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../../hooks/useAuth'
 import { colors } from '../../utils/theme'
@@ -8,10 +16,16 @@ import { useHelmetConnection } from '../../hooks/useHelmetConnection'
 
 const C = colors
 
-export default function DashboardHeader({ onLogout, onHelmetData, onConnectionChange }) {
+export default function DashboardHeader({
+  onLogout,
+  onHelmetData,
+  onConnectionChange,
+}) {
   const { user } = useAuth()
   const navigation = useNavigation()
+
   const [dropdown, setDropdown] = useState(false)
+
   const helmet = useHelmetConnection()
 
   useEffect(() => {
@@ -19,13 +33,17 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
   }, [helmet.connectionState, onConnectionChange])
 
   useEffect(() => {
-    if (helmet.helmetData) onHelmetData?.(helmet.helmetData)
+    if (helmet.helmetData) {
+      onHelmetData?.(helmet.helmetData)
+    }
   }, [helmet.helmetData, onHelmetData])
 
   const username = user?.username || 'User'
   const initial = (username?.[0] || 'U').toUpperCase()
 
+  // ── Current date ─────────────────────────────────────────────
   const today = new Date()
+
   const dateText = today
     .toLocaleDateString('en-US', {
       weekday: 'short',
@@ -34,19 +52,32 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
     })
     .toUpperCase()
 
+  // ── Logout ───────────────────────────────────────────────────
   const handleLogout = () => {
     setDropdown(false)
+
     helmet.disconnect()
+
     onLogout()
-    navigation.reset({ index: 0, routes: [{ name: 'Login' }] })
+
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Login' }],
+    })
   }
 
   return (
     <View style={styles.container}>
+      {/* ── Top row ─────────────────────────────────────────── */}
       <View style={styles.topRow}>
         <View>
-          <Text style={styles.greeting}>Hi {username},</Text>
-          <Text style={styles.date}>{dateText}</Text>
+          <Text style={styles.greeting}>
+            Hi {username},
+          </Text>
+
+          <Text style={styles.date}>
+            {dateText}
+          </Text>
         </View>
 
         <View style={styles.actions}>
@@ -59,29 +90,53 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
             style={styles.avatar}
             activeOpacity={0.8}
           >
-            <Text style={styles.avatarText}>{initial}</Text>
+            <Text style={styles.avatarText}>
+              {initial}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
 
+      {/* ── Helmet connect ─────────────────────────────────── */}
       <HelmetConnectButton helmet={helmet} />
 
-      <Modal visible={dropdown} transparent animationType="fade" onRequestClose={() => setDropdown(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setDropdown(false)}>
-          <Pressable style={styles.menu} onPress={e => e.stopPropagation()}>
+      {/* ── Dropdown menu ──────────────────────────────────── */}
+      <Modal
+        visible={dropdown}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setDropdown(false)}
+      >
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => setDropdown(false)}
+        >
+          <Pressable
+            style={styles.menu}
+            onPress={e => e.stopPropagation()}
+          >
+            {/* Header */}
             <View style={styles.menuHeader}>
               <View style={styles.menuAvatar}>
-                <Text style={styles.menuAvatarText}>{initial}</Text>
+                <Text style={styles.menuAvatarText}>
+                  {initial}
+                </Text>
               </View>
 
               <View>
-                <Text style={styles.menuName}>{username}</Text>
-                <Text style={styles.menuEmail}>{user?.email || ''}</Text>
+                <Text style={styles.menuName}>
+                  {username}
+                </Text>
+
+                <Text style={styles.menuEmail}>
+                  {user?.email || ''}
+                </Text>
               </View>
             </View>
 
             <View style={styles.divider} />
 
+            {/* Change Profile */}
             <TouchableOpacity
               style={styles.menuItem}
               activeOpacity={0.7}
@@ -91,22 +146,59 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
               }}
             >
               <Text style={styles.menuItemIcon}>👤</Text>
-              <Text style={styles.menuItemText}>Change Profile</Text>
+
+              <Text style={styles.menuItemText}>
+                Change Profile
+              </Text>
+
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
+            {/* Settings */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setDropdown(false)
+                navigation.navigate('Settings')
+              }}
+            >
               <Text style={styles.menuItemIcon}>⚙️</Text>
-              <Text style={styles.menuItemText}>Settings</Text>
+
+              <Text style={styles.menuItemText}>
+                Settings
+              </Text>
+
               <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.menuItem} onPress={handleLogout} activeOpacity={0.7}>
+            {/* Logout */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
               <Text style={styles.menuItemIcon}>🚪</Text>
-              <Text style={[styles.menuItemText, { color: '#DC2626' }]}>Log Out</Text>
-              <Text style={[styles.menuArrow, { color: '#DC2626' }]}>›</Text>
+
+              <Text
+                style={[
+                  styles.menuItemText,
+                  { color: '#DC2626' },
+                ]}
+              >
+                Log Out
+              </Text>
+
+              <Text
+                style={[
+                  styles.menuArrow,
+                  { color: '#DC2626' },
+                ]}
+              >
+                ›
+              </Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -116,25 +208,153 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
 }
 
 const styles = StyleSheet.create({
-  container:{ backgroundColor:C.white, padding:20, paddingBottom:16 },
-  topRow:{ flexDirection:'row', justifyContent:'space-between', alignItems:'center', marginBottom:14 },
-  greeting:{ fontSize:22, fontWeight:'800', color:C.text },
-  date:{ fontSize:11, color:C.muted, fontWeight:'500', letterSpacing:1 },
-  actions:{ flexDirection:'row', alignItems:'center', gap:14 },
-  iconBtn:{ padding:2 },
-  iconText:{ fontSize:18 },
-  avatar:{ width:36, height:36, borderRadius:18, backgroundColor:'#f97316', alignItems:'center', justifyContent:'center' },
-  avatarText:{ color:'#fff', fontWeight:'800', fontSize:14 },
-  backdrop:{ flex:1, backgroundColor:'rgba(0,0,0,0.35)' },
-  menu:{ position:'absolute', top:70, right:16, width:240, backgroundColor:'#fff', borderRadius:16, shadowColor:'#000', shadowOffset:{ width:0, height:8 }, shadowOpacity:0.15, shadowRadius:20, elevation:10, overflow:'hidden' },
-  menuHeader:{ flexDirection:'row', alignItems:'center', gap:12, padding:16 },
-  menuAvatar:{ width:42, height:42, borderRadius:21, backgroundColor:'#f97316', alignItems:'center', justifyContent:'center' },
-  menuAvatarText:{ color:'#fff', fontWeight:'800', fontSize:16 },
-  menuName:{ fontSize:15, fontWeight:'800', color:C.text },
-  menuEmail:{ fontSize:12, color:C.muted, marginTop:2 },
-  divider:{ height:1, backgroundColor:'#F3F4F6' },
-  menuItem:{ flexDirection:'row', alignItems:'center', paddingHorizontal:16, paddingVertical:14, gap:12 },
-  menuItemIcon:{ fontSize:18, width:24 },
-  menuItemText:{ flex:1, fontSize:15, fontWeight:'600', color:C.text },
-  menuArrow:{ fontSize:18, color:C.muted },
+  container: {
+    backgroundColor: C.white,
+    padding: 20,
+    paddingBottom: 16,
+  },
+
+  topRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+
+  greeting: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: C.text,
+  },
+
+  date: {
+    fontSize: 11,
+    color: C.muted,
+    fontWeight: '500',
+    letterSpacing: 1,
+  },
+
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+
+  iconBtn: {
+    padding: 2,
+  },
+
+  iconText: {
+    fontSize: 18,
+  },
+
+  avatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f97316',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  avatarText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
+  },
+
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+
+  menu: {
+    position: 'absolute',
+    top: 70,
+    right: 16,
+    width: 240,
+
+    backgroundColor: '#fff',
+    borderRadius: 16,
+
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 8,
+    },
+
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+
+    overflow: 'hidden',
+  },
+
+  menuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+  },
+
+  menuAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+
+    backgroundColor: '#f97316',
+
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  menuAvatarText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+
+  menuName: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: C.text,
+  },
+
+  menuEmail: {
+    fontSize: 12,
+    color: C.muted,
+    marginTop: 2,
+  },
+
+  divider: {
+    height: 1,
+    backgroundColor: '#F3F4F6',
+  },
+
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+
+    gap: 12,
+  },
+
+  menuItemIcon: {
+    fontSize: 18,
+    width: 24,
+  },
+
+  menuItemText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.text,
+  },
+
+  menuArrow: {
+    fontSize: 18,
+    color: C.muted,
+  },
 })
