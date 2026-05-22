@@ -39,6 +39,26 @@ export async function apiFetch(path, options = {}) {
 
   return data
 }
+export async function apiMultipart(path, formData, method = 'PUT') {
+  const token = await AsyncStorage.getItem('jwt_token')
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Do NOT set Content-Type for FormData
+    },
+    body: formData,
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed: ${response.status}`)
+  }
+
+  return data
+}
 
 /**
  * Convenience wrappers for common HTTP methods.

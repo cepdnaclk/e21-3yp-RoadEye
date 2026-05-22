@@ -59,8 +59,17 @@ export default function DashboardHeader({ onLogout, onHelmetData, onConnectionCh
               </View>
             </View>
             <View style={styles.divider} />
-            <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
-              <Text style={styles.menuItemIcon}>👤</Text><Text style={styles.menuItemText}>Change Profile</Text><Text style={styles.menuArrow}>›</Text>
+            <TouchableOpacity
+              style={styles.menuItem}
+              activeOpacity={0.7}
+              onPress={() => {
+                setDropdown(false)
+                navigation.navigate('ChangeProfile')
+              }}
+            >
+              <Text style={styles.menuItemIcon}>👤</Text>
+              <Text style={styles.menuItemText}>Change Profile</Text>
+              <Text style={styles.menuArrow}>›</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.menuItem} activeOpacity={0.7}>
               <Text style={styles.menuItemIcon}>⚙️</Text><Text style={styles.menuItemText}>Settings</Text><Text style={styles.menuArrow}>›</Text>

@@ -22,6 +22,7 @@
     "expo-device": "~6.0.2",
     "expo-document-picker": "~12.0.2",
     "expo-file-system": "~17.0.1",
+    "expo-image-picker": "~15.1.0",
     "expo-linear-gradient": "~13.0.2",
     "expo-location": "~17.0.1",
     "expo-notifications": "~0.28.19",
@@ -44,6 +45,7 @@
     "react-native-sound": "^0.11.2",
     "react-native-spotify-remote": "^0.3.10",
     "react-native-svg": "15.2.0",
+    "react-native-tts": "^4.1.1",
     "react-native-udp": "^4.1.7",
     "react-native-webview": "13.8.6"
   },

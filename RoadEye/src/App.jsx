@@ -11,6 +11,7 @@ import EmergencyPage    from './pages/EmergencyPage'
 import NavigationScreen from './pages/NavigationScreen'
 import { requestNotificationPermission } from './utils/pushNotifications'
 import { startESP32Discovery } from './utils/ESP32Discovery'   // ← ADD THIS
+import ChangeProfilePage from './pages/ChangeProfilePage'
 
 const Stack = createNativeStackNavigator()
 
@@ -68,6 +69,7 @@ function RootNavigator() {
             )}
           </Stack.Screen>
           <Stack.Screen name="Navigation" component={NavigationScreen} />
+          <Stack.Screen name="ChangeProfile" component={ChangeProfilePage} />
         </>
       ) : (
         <>

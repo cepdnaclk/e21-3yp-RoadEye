@@ -7,6 +7,8 @@ import {
 } from 'react-native'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
+import Tts from 'react-native-tts'
+
 import {
   startNavSession,
   stopNavSession,
@@ -17,33 +19,54 @@ import {
   setDestinationWeatherTarget,
   setHelmetView,
 } from '../utils/NavigationSession'
+
 import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 import { useAuth } from '../hooks/useAuth'
-
 import { getESP32IP } from '../utils/ESP32Discovery'
 
 export default function NavigationScreen({ navigation }) {
   const { userId, token } = useAuth()
+
   const webViewRef    = useRef(null)
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
   const sessionActive = useRef(false)
   const webViewReady  = useRef(false)
 
-  // Track total route distance so speedApi can compute completionPct
   const totalDistKmRef = useRef(null)
+  const weatherCodesRef = useRef({
+    startWmoCode: null,
+    destWmoCode: null,
+  })
 
-  // Latest WMO weather codes from WeatherCard — forwarded to speedApi
-  const weatherCodesRef = useRef({ startWmoCode: null, destWmoCode: null })
+  const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
+  const [helmetConnected, setHelmetConnected] = useState(
+    HelmetMapStreamer.isActive()
+  )
 
-  const [gpsStatus,       setGpsStatus]       = useState('Acquiring GPS…')
-  const [helmetConnected, setHelmetConnected] = useState(HelmetMapStreamer.isActive())
+  // ── TTS setup ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    Tts.setDefaultLanguage('en-US')
+    Tts.setDefaultRate(0.45)
+    Tts.setDefaultPitch(1.0)
+
+    return () => {
+      Tts.stop()
+    }
+  }, [])
+
+  const speakNav = useCallback((text) => {
+    if (!text) return
+    Tts.stop()
+    Tts.speak(text)
+  }, [])
 
   // ── Inject helpers ──────────────────────────────────────────────────────────
   const injectMessage = useCallback((data) => {
     if (!webViewReady.current) return
+
     const script = `
       try {
         window.dispatchEvent(new MessageEvent('message', {
@@ -52,6 +75,7 @@ export default function NavigationScreen({ navigation }) {
       } catch(e) {}
       true;
     `
+
     webViewRef.current?.injectJavaScript(script)
   }, [])
 
@@ -74,42 +98,52 @@ export default function NavigationScreen({ navigation }) {
   // ── GPS ─────────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
+
     if (status !== 'granted') {
-      Alert.alert('Location Permission', 'GPS permission is required for navigation.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ])
+      Alert.alert(
+        'Location Permission',
+        'GPS permission is required for navigation.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      )
       return
     }
+
     setGpsStatus('GPS acquiring…')
     locationSub.current?.remove()
+
     locationSub.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 5,
+      },
       (loc) => {
         const { latitude, longitude, speed } = loc.coords
         const speedKmh = speed ? Math.round(speed * 3.6) : 0
+
         setGpsStatus('GPS ✓')
         updateNavSpeed(speedKmh)
 
-        // Forward location to the WebView map
-        injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
+        injectMessage({
+          type: 'gps',
+          lat: latitude,
+          lng: longitude,
+          speed: speedKmh,
+        })
 
-        // PKT_NAVIGATION — NavigationSession.updateNavSpeed() already calls
-        // _sendNavigationPacket() internally, so no duplicate send needed here.
-
-        // POST speed event to HTTP backend with full nav context
         sendSpeedEvent(
           {
-            speed:        speedKmh,
-            userId:       userId,
-            totalDistKm:  totalDistKmRef.current,
+            speed: speedKmh,
+            userId,
+            totalDistKm: totalDistKmRef.current,
             startWmoCode: weatherCodesRef.current.startWmoCode,
-            destWmoCode:  weatherCodesRef.current.destWmoCode,
+            destWmoCode: weatherCodesRef.current.destWmoCode,
           },
-          token,
+          token
         )
       }
     )
-  }, [injectMessage])
+  }, [injectMessage, navigation, userId, token])
 
   // ── WebView ready ───────────────────────────────────────────────────────────
   const onWebViewLoad = useCallback(() => {
@@ -120,114 +154,151 @@ export default function NavigationScreen({ navigation }) {
     }
 
     const existing = getNavState()
+
     if (existing.active && existing.destination) {
-      sessionActive.current          = true
-      totalDistKmRef.current         = existing.totalDistKm ?? existing.distKm
-      weatherCodesRef.current        = {
+      sessionActive.current = true
+      totalDistKmRef.current = existing.totalDistKm ?? existing.distKm
+
+      weatherCodesRef.current = {
         startWmoCode: existing.startWmoCode ?? null,
-        destWmoCode:  existing.destWmoCode  ?? null,
+        destWmoCode: existing.destWmoCode ?? null,
       }
+
       setDestinationWeatherTarget({
-        lat:  existing.destination.lat,
-        lng:  existing.destination.lng,
+        lat: existing.destination.lat,
+        lng: existing.destination.lng,
         name: existing.destination.name,
       })
+
       setTimeout(() => {
         injectMessage({
-          type:        'restoreRoute',
+          type: 'restoreRoute',
           destination: existing.destination.name,
-          destLat:     existing.destination.lat,
-          destLng:     existing.destination.lng,
-          distKm:      existing.distKm,
-          etaMin:      existing.etaMin,
+          destLat: existing.destination.lat,
+          destLng: existing.destination.lng,
+          distKm: existing.distKm,
+          etaMin: existing.etaMin,
         })
+
         if (existing.helmetView) {
           setTimeout(() => enableHelmetView(), 800)
         }
       }, 500)
     }
+
     startGPS()
   }, [startGPS, injectMessage, enableHelmetView, injectJS])
 
   // ── WebView messages ────────────────────────────────────────────────────────
-  const onWebViewMessage = useCallback(async (event) => {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data)
+  const onWebViewMessage = useCallback(
+    async (event) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data)
 
-      // ── Map frame from HelmetMapStreamer canvas capture ─────────────────
-      if (msg.type === '__mapFrame') {
-        if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
-        return
-      }
-
-      // ── Route started ───────────────────────────────────────────────────
-      if (msg.type === 'route') {
-        sessionActive.current  = true
-        totalDistKmRef.current = msg.distKm   // snapshot for completionPct
-
-        await startNavSession({
-          destination: { name: msg.destination, lat: msg.destLat, lng: msg.destLng },
-          distKm:  msg.distKm,
-          etaMin:  msg.etaMin,
-        })
-        setDestinationWeatherTarget({
-          lat:  msg.destLat,
-          lng:  msg.destLng,
-          name: msg.destination,
-        })
-        // PKT_NAVIGATION + PKT_DATETIME sent inside startNavSession()
-      }
-
-      // ── Routing step update ─────────────────────────────────────────────
-      if (msg.type === 'step') {
-        updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
-        // If the routing engine also provides a refreshed remaining distance
-        // (some map libs include it in step messages), update it now.
-        if (msg.distKm != null) updateNavDist(msg.distKm)
-        // PKT_NAVIGATION refresh is called inside updateNavStep()
-      }
-
-      // ── Route completed / cancelled ─────────────────────────────────────
-      if (msg.type === 'clear' || msg.type === 'arrived') {
-        sessionActive.current  = false
-        totalDistKmRef.current = null
-        await stopNavSession()
-        // stopNavSession() cleans up state; no extra UDP send needed
-      }
-
-      // ── Helmet view toggled from inside the WebView ─────────────────────
-      if (msg.type === 'helmetViewToggled') {
-        setHelmetView(msg.active)
-      }
-
-      // ── Weather codes pushed from WeatherCard (via WebView postMessage) ─
-      // Wire this up if your WebView page forwards weather data back here.
-      if (msg.type === 'weatherUpdate') {
-        weatherCodesRef.current = {
-          startWmoCode: msg.startWmoCode ?? null,
-          destWmoCode:  msg.destWmoCode  ?? null,
+        // Map frame from HelmetMapStreamer canvas capture
+        if (msg.type === '__mapFrame') {
+          if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
+          return
         }
-      }
 
-    } catch (_) {}
-  }, [])
+        // Route created
+        if (msg.type === 'route') {
+          sessionActive.current = true
+          totalDistKmRef.current = msg.distKm
+
+          await startNavSession({
+            destination: {
+              name: msg.destination,
+              lat: msg.destLat,
+              lng: msg.destLng,
+            },
+            distKm: msg.distKm,
+            etaMin: msg.etaMin,
+          })
+
+          setDestinationWeatherTarget({
+            lat: msg.destLat,
+            lng: msg.destLng,
+            name: msg.destination,
+          })
+
+          speakNav(`Navigation started to ${msg.destination}`)
+        }
+
+        // Turn-by-turn step
+        if (msg.type === 'step') {
+          updateNavStep({
+            arrow: msg.arrow,
+            text: msg.text,
+            dist: msg.dist,
+          })
+
+          if (msg.distKm != null) {
+            updateNavDist(msg.distKm)
+          }
+
+          speakNav(`${msg.text}. ${msg.dist}`)
+        }
+
+        // Arrived
+        if (msg.type === 'arrived') {
+          sessionActive.current = false
+          totalDistKmRef.current = null
+
+          speakNav('You have arrived at your destination')
+
+          await stopNavSession()
+        }
+
+        // Clear route
+        if (msg.type === 'clear') {
+          sessionActive.current = false
+          totalDistKmRef.current = null
+
+          Tts.stop()
+          await stopNavSession()
+        }
+
+        // Helmet view toggled from WebView
+        if (msg.type === 'helmetViewToggled') {
+          setHelmetView(msg.active)
+        }
+
+        // Weather update
+        if (msg.type === 'weatherUpdate') {
+          weatherCodesRef.current = {
+            startWmoCode: msg.startWmoCode ?? null,
+            destWmoCode: msg.destWmoCode ?? null,
+          }
+        }
+      } catch (e) {
+        console.warn('WebView message error:', e?.message)
+      }
+    },
+    [speakNav]
+  )
 
   // ── Helmet connect / disconnect ─────────────────────────────────────────────
-  const sendHelmetConnected = useCallback((helmetIp) => {
-    if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
+  const sendHelmetConnected = useCallback(
+    (helmetIp) => {
+      if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
 
-    // Send current date/time as soon as the helmet connects
-    HelmetUDP.sendDateTime(new Date())
+      HelmetUDP.sendDateTime(new Date())
 
-    HelmetMapStreamer.start(injectJS)
-    injectMessage({ type: 'helmetConnected' })
-    enableHelmetView()
-    setHelmetConnected(true)
-  }, [injectMessage, injectJS, enableHelmetView])
+      HelmetMapStreamer.start(injectJS)
+
+      injectMessage({ type: 'helmetConnected' })
+      enableHelmetView()
+      setHelmetConnected(true)
+    },
+    [injectMessage, injectJS, enableHelmetView]
+  )
 
   const sendHelmetDisconnected = useCallback(() => {
+    Tts.stop()
     HelmetMapStreamer.stop()
     HelmetUDP.destroy()
+
     injectMessage({ type: 'helmetDisconnected' })
     disableHelmetView()
     setHelmetConnected(false)
@@ -236,42 +307,54 @@ export default function NavigationScreen({ navigation }) {
   // ── App background / foreground ─────────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
-      if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
+      if (
+        appStateRef.current === 'active' &&
+        nextState.match(/inactive|background/)
+      ) {
         HelmetMapStreamer.pause()
+
         if (sessionActive.current) {
           locationSub.current?.remove()
           locationSub.current = null
         }
       }
-      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
+
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === 'active'
+      ) {
         if (HelmetMapStreamer.isActive()) {
           HelmetMapStreamer.resume(injectJS)
         }
+
         if (sessionActive.current && !locationSub.current) {
           startGPS()
         }
-        // Resync date/time on foreground if helmet is connected
+
         if (HelmetUDP.hasPeerIP()) {
           HelmetUDP.sendDateTime(new Date())
         }
       }
+
       appStateRef.current = nextState
     })
+
     return () => sub.remove()
   }, [startGPS, injectJS])
 
   // ── Mount / unmount ─────────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
+
     if (existing.active) {
-      sessionActive.current  = true
+      sessionActive.current = true
       totalDistKmRef.current = existing.totalDistKm ?? existing.distKm
     }
+
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // Do NOT stop HelmetMapStreamer here — it keeps running while backgrounded.
-      // It is only stopped explicitly via the disconnect button or Stop Navigation.
+      Tts.stop()
     }
   }, [])
 
@@ -283,20 +366,24 @@ export default function NavigationScreen({ navigation }) {
         'Navigation is still running in the background. Stop it?',
         [
           {
-            text:  'Keep Running',
+            text: 'Keep Running',
             style: 'cancel',
             onPress: () => navigation.goBack(),
           },
           {
-            text:  'Stop Navigation',
+            text: 'Stop Navigation',
             style: 'destructive',
             onPress: async () => {
+              Tts.stop()
               HelmetMapStreamer.stop()
               HelmetUDP.destroy()
+
               await stopNavSession()
-              sessionActive.current  = false
+
+              sessionActive.current = false
               totalDistKmRef.current = null
               setHelmetConnected(false)
+
               navigation.goBack()
             },
           },
@@ -309,12 +396,13 @@ export default function NavigationScreen({ navigation }) {
 
   const mapSource = Platform.select({
     android: { uri: 'file:///android_asset/navigation-map.html' },
-    ios:     { uri: 'navigation-map.html' },
+    ios: { uri: 'navigation-map.html' },
   })
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
+
       <WebView
         ref={webViewRef}
         source={mapSource}
@@ -346,53 +434,97 @@ export default function NavigationScreen({ navigation }) {
             sendHelmetDisconnected()
           } else {
             const ip = getESP32IP()
+
             if (!ip) {
-              Alert.alert('Scanning...', 'ESP32 not found yet. Make sure helmet is on and on the same WiFi.')
+              Alert.alert(
+                'Scanning...',
+                'ESP32 not found yet. Make sure helmet is on and on the same WiFi.'
+              )
               return
             }
-            sendHelmetConnected(ip)   // ✅ only connects when IP is known
+
+            sendHelmetConnected(ip)
           }
         }}
       >
-        <Text style={styles.backBtnText}>{helmetConnected ? '📡' : '📵'}</Text>
+        <Text style={styles.backBtnText}>
+          {helmetConnected ? '📡' : '📵'}
+        </Text>
       </TouchableOpacity>
     </View>
   )
 }
 
 const ACCENT = '#00dca0'
-const BG     = 'rgba(10, 12, 16, 0.88)'
+const BG = 'rgba(10, 12, 16, 0.88)'
 const BORDER = 'rgba(0, 220, 180, 0.18)'
 const ACTIVE = 'rgba(0, 220, 160, 0.25)'
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0c10' },
-  webview:   { flex: 1, backgroundColor: '#0a0c10' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0c10',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#0a0c10',
+  },
   gpsBadge: {
-    position: 'absolute', top: 80, alignSelf: 'center',
-    backgroundColor: BG, borderWidth: 1, borderColor: BORDER,
-    borderRadius: 4, paddingHorizontal: 16, paddingVertical: 6,
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
   gpsBadgeText: {
     color: ACCENT,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   backBtn: {
-    position: 'absolute', top: 12, left: 12,
-    width: 36, height: 36, backgroundColor: BG,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 5,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 36,
+    height: 36,
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backBtnText: { color: ACCENT, fontSize: 24, lineHeight: 28, marginTop: -2 },
+  backBtnText: {
+    color: ACCENT,
+    fontSize: 24,
+    lineHeight: 28,
+    marginTop: -2,
+  },
   debugBtn: {
-    position: 'absolute', top: 12, right: 12,
-    width: 36, height: 36, backgroundColor: BG,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 5,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   debugBtnActive: {
     backgroundColor: ACTIVE,
-    borderColor:     ACCENT,
+    borderColor: ACCENT,
   },
 })
+
+
+
+// npm install react-native-tts
