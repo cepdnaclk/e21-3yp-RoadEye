@@ -12,6 +12,8 @@ import NavigationScreen from './pages/NavigationScreen'
 import { requestNotificationPermission } from './utils/pushNotifications'
 import { startESP32Discovery } from './utils/ESP32Discovery'   // ← ADD THIS
 import ChangeProfilePage from './pages/ChangeProfilePage'
+import SettingsPage from './pages/SettingsPage'
+import { AppSettingsProvider } from './hooks/useAppSettings'
 
 const Stack = createNativeStackNavigator()
 
@@ -70,8 +72,9 @@ function RootNavigator() {
           </Stack.Screen>
           <Stack.Screen name="Navigation" component={NavigationScreen} />
           <Stack.Screen name="ChangeProfile" component={ChangeProfilePage} />
-        </>
-      ) : (
+          <Stack.Screen name="Settings" component={SettingsPage} />
+          </>
+          ) : (
         <>
           <Stack.Screen name="Login"  component={LoginPage} />
           <Stack.Screen name="Signup" component={SignupPage} />
@@ -84,9 +87,11 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <AppSettingsProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AppSettingsProvider>
     </AuthProvider>
   )
 }
