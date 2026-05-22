@@ -8,13 +8,9 @@ import PermissionModal from '../components/shared/PermissionModal'
 // ── Same BASE_URL as SignupPage ─────────────────────────────────────────────
 // Android emulator  → 'http://10.0.2.2:8080'
 // iOS simulator     → 'http://localhost:8080'
-<<<<<<< HEAD
-// Physical device   → 'http://192.168.137.251:8080'
-const BASE_URL = 'http://192.168.137.251:8080'
-=======
+
 // Physical device   → 'http://10.30.1.169:8080'
 const BASE_URL = 'http://10.30.12.231:8080'
->>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
