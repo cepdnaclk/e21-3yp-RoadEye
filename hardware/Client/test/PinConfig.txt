@@ -1,0 +1,44 @@
+free pins  ->  16, 17, 19, 21
+
+GPIO 4, 5, 16, 17, 18, 19, 21, 22, 23, 25, 26, 27, 32, 33  (input/output)
+
+GPIO 34, 35, 36, 39  (input only)
+
+GPIO 0, 2, 12, 15  (boot senstive)
+
+GPIO 6–11  (used for flash memory)
+
+--- Display 1 ---
+VCC             3.3V 
+GND             GND 
+SCL / SCK       GPIO 18 
+SDA / MOSI      GPIO 23 
+ES / RST        GPIO 4 
+DC / A0         GPIO 2 
+CS              GPIO 5 
+BL / LED        3.3V
+
+--- Display 2 ---
+C2 (TFT CS)     GPIO 15
+DC              GPIO 27
+RST             GPIO 14
+
+VCC             3.3V
+GND             GND
+SCL             GPIO 18
+SDA             GPIO 23
+
+--- Amplifier ---
+VIN	            3.3V
+GND	            GND
+BCLK	        GPIO 26
+LRC / WS	    GPIO 25
+DIN	            GPIO 22
+GAIN	        Optional (volume control)
+SD	            (optional GPIO or 3.3V)	Shutdown control (tie to 3.3V for always on)
+
+--- IMU ---
+VCC	            3.3V
+GND	            GND
+SCL	            GPIO 32
+SDA	            GPIO 33

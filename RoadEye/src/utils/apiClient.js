@@ -4,7 +4,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // Android emulator  → 'http://10.0.2.2:8080'
 // iOS simulator     → 'http://localhost:8080'
 // Physical device   → 'http://<YOUR_PC_LAN_IP>:8080'
+<<<<<<< HEAD
 const BASE_URL = 'http://192.168.137.174:8081'
+=======
+const BASE_URL = 'http://10.30.12.231:8081'
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
 // ───────────────────────────────────────────────────────────────────────────
 
 /**

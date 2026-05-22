@@ -2,7 +2,11 @@
   "devices": [
     {
       "installationId": "267be9ab-87e9-40a7-8a8d-56c7926131ee",
+<<<<<<< HEAD
       "lastUsed": 1779421425235
+=======
+      "lastUsed": 1779422891984
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
     }
   ]
 }

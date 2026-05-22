@@ -1,8 +1,15 @@
 // src/api/speedApi.js
 
+<<<<<<< HEAD
 const BASE_URL = "http://192.168.137.251:8080/api"
+=======
+const BASE_URL = "http://10.30.12.231:8080/api"
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
 
-// 🔹 Send speed event
+/**
+ * Send a speed reading to the backend.
+ * Returns { id, speed, eventTime } so dashboard can show confirmed speed.
+ */
 export async function sendSpeedEvent(data, token) {
   // ── Skip if no token — speeds won't be saved without auth ──────────────────
   if (!token) {
@@ -67,14 +74,23 @@ export async function sendSpeedEvent(data, token) {
     }
 
     const result = await res.json()
+<<<<<<< HEAD
     console.log('[speedApi] ✅ Speed event saved:', result)
     return result
   } catch (err) {
     console.error('[speedApi] ❌ Speed send error:', err)
+=======
+    console.log("✅ Speed saved:", result)
+    return result // returns { id, speed, eventTime }
+
+  } catch (err) {
+    console.error("❌ Speed send error:", err)
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
     return null
   }
 }
 
+<<<<<<< HEAD
 // ── getTodaySpeed ─────────────────────────────────────────────────────────────
 // Fetches all speed events for today for the given user (for chart rendering).
 // Unchanged from original — read-only, no nav fields needed.
@@ -82,18 +98,26 @@ export async function sendSpeedEvent(data, token) {
 // @param {string} userId
 // @param {string} token  Bearer token
 // @returns {Promise<Array>}  array of speed event objects, or [] on error
+=======
+
+/**
+ * Get today's speed readings for the chart.
+ */
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
 export async function getTodaySpeed(userId, token) {
   try {
     const res = await fetch(`${BASE_URL}/speed/today/${userId}`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      headers: { Authorization: `Bearer ${token}` },
     })
+<<<<<<< HEAD
 
     if (!res.ok) {
       throw new Error(`[speedApi] Failed to fetch speed data: ${res.status}`)
     }
 
+=======
+    if (!res.ok) throw new Error("Failed to fetch speed data")
+>>>>>>> 5c8dbf4ad536e74b19ac6ab29fb930f97952437e
     return await res.json()
   } catch (err) {
     console.error('[speedApi] ❌ Fetch speed error:', err)
