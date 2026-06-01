@@ -12,7 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/crashes")
+@RequestMapping("/crashes")
 @RequiredArgsConstructor
 public class CrashEventController {
 

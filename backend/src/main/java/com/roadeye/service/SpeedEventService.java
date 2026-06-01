@@ -23,12 +23,15 @@ public class SpeedEventService {
 
     //SAVE SPEED (called frequently)
     //Returns the saved event so the controller can return speed back to frontend.
-    public void saveSpeed(UUID userId,
+    public SpeedEvent saveSpeed(UUID userId,
                           Double speed,
                           Double lat,
                           Double lon) {
 
-        if (speed == null) return; // safety
+        // if (speed == null) return; // safety
+        if (speed == null) {
+            throw new RuntimeException("Speed cannot be null");
+}
 
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found" + userId));

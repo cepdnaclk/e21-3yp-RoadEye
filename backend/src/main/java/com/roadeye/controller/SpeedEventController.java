@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/speed")
+@RequestMapping("/speed")
 @RequiredArgsConstructor
 @Slf4j
 public class SpeedEventController {

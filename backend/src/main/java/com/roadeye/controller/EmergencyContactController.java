@@ -12,7 +12,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @RestController
-@RequestMapping("/api/emergency-contacts")
+@RequestMapping("/emergency-contacts")
 @RequiredArgsConstructor
 public class EmergencyContactController {
 

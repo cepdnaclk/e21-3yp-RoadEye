@@ -2,7 +2,10 @@ spring:
   application:
     name: roadeye-backend
   datasource:
-    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/roadeye
+    # url: jdbc:postgresql://${RDS_ENDPOINT}:5432/postgres
+    # url: jdbc:postgresql://${RDS_ENDPOINT}:6543/postgres?sslmode=require
+    # url: jdbc:postgresql://${RDS_ENDPOINT}:6543/postgres?sslmode=require&prepareThreshold=0
+    url: jdbc:postgresql://${RDS_ENDPOINT}:5432/postgres?sslmode=require
     username: ${RDS_USERNAME}
     password: ${RDS_PASSWORD}
     driverClassName: org.postgresql.Driver
@@ -12,8 +15,8 @@ spring:
       connectionTimeout: 30000
   jpa:
     hibernate:
-      ddl-auto: validate
-    database-platform: org.hibernate.dialect.PostgreSQL15Dialect
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     properties:
       hibernate:
         format_sql: true
@@ -35,6 +38,8 @@ server:
 logging:
   level:
     com.roadeye: INFO
+    com.zaxxer.hikari: DEBUG
+    org.postgresql: DEBUG
     org.springframework.web: INFO
     org.springframework.security: INFO
     org.hibernate.SQL: DEBUG
@@ -45,7 +50,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,metrics,info
+        include: health,metrics,info,mappings
   endpoint:
     health:
       show-details: when-authorized

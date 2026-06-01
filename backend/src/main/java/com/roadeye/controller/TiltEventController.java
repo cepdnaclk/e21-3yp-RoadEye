@@ -20,7 +20,7 @@ import java.util.UUID;
  * GET  /api/tilt/threshold                  — current threshold value
  */
 @RestController
-@RequestMapping("/api/tilt")
+@RequestMapping("/tilt")
 @RequiredArgsConstructor
 @Slf4j
 public class TiltEventController {
