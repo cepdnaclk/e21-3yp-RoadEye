@@ -31,16 +31,26 @@ import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 import { useAuth } from '../hooks/useAuth'
+<<<<<<< HEAD
 import { useAppSettings } from '../hooks/useAppSettings'
+=======
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
 import { getESP32IP } from '../utils/ESP32Discovery'
 
 export default function NavigationScreen({ navigation }) {
   const { userId, token } = useAuth()
+<<<<<<< HEAD
   const { darkMode, textScale, voiceGuidance } = useAppSettings()
 
   const webViewRef = useRef(null)
   const locationSub = useRef(null)
   const appStateRef = useRef(AppState.currentState)
+=======
+
+  const webViewRef    = useRef(null)
+  const locationSub   = useRef(null)
+  const appStateRef   = useRef(AppState.currentState)
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const sessionActive = useRef(false)
   const webViewReady = useRef(false)
 
@@ -49,6 +59,7 @@ export default function NavigationScreen({ navigation }) {
     startWmoCode: null,
     destWmoCode: null,
   })
+<<<<<<< HEAD
 
   const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
   const [helmetConnected, setHelmetConnected] = useState(
@@ -75,6 +86,32 @@ export default function NavigationScreen({ navigation }) {
     [voiceGuidance]
   )
 
+=======
+
+  const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
+  const [helmetConnected, setHelmetConnected] = useState(
+    HelmetMapStreamer.isActive()
+  )
+
+  // ── TTS setup ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    Tts.setDefaultLanguage('en-US')
+    Tts.setDefaultRate(0.45)
+    Tts.setDefaultPitch(1.0)
+
+    return () => {
+      Tts.stop()
+    }
+  }, [])
+
+  const speakNav = useCallback((text) => {
+    if (!text) return
+    Tts.stop()
+    Tts.speak(text)
+  }, [])
+
+  // ── Inject helpers ──────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const injectMessage = useCallback((data) => {
     if (!webViewReady.current) return
 
@@ -95,6 +132,10 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(jsString)
   }, [])
 
+<<<<<<< HEAD
+=======
+  // ── Helmet view helpers ─────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
@@ -105,6 +146,10 @@ export default function NavigationScreen({ navigation }) {
     setHelmetView(false)
   }, [injectMessage])
 
+<<<<<<< HEAD
+=======
+  // ── GPS ─────────────────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
 
@@ -154,6 +199,10 @@ export default function NavigationScreen({ navigation }) {
     )
   }, [injectMessage, navigation, userId, token])
 
+<<<<<<< HEAD
+=======
+  // ── WebView ready ───────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const onWebViewLoad = useCallback(() => {
     webViewReady.current = true
 
@@ -197,16 +246,28 @@ export default function NavigationScreen({ navigation }) {
     startGPS()
   }, [startGPS, injectMessage, enableHelmetView, injectJS])
 
+<<<<<<< HEAD
+=======
+  // ── WebView messages ────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const onWebViewMessage = useCallback(
     async (event) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data)
 
+<<<<<<< HEAD
+=======
+        // Map frame from HelmetMapStreamer canvas capture
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === '__mapFrame') {
           if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
           return
         }
 
+<<<<<<< HEAD
+=======
+        // Route created
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'route') {
           sessionActive.current = true
           totalDistKmRef.current = msg.distKm
@@ -230,6 +291,10 @@ export default function NavigationScreen({ navigation }) {
           speakNav(`Navigation started to ${msg.destination}`)
         }
 
+<<<<<<< HEAD
+=======
+        // Turn-by-turn step
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'step') {
           updateNavStep({
             arrow: msg.arrow,
@@ -241,6 +306,7 @@ export default function NavigationScreen({ navigation }) {
             updateNavDist(msg.distKm)
           }
 
+<<<<<<< HEAD
           if (voiceGuidance === 'Full navigation voice') {
             speakNav(`${msg.text}. ${msg.dist}`)
           }
@@ -254,14 +320,28 @@ export default function NavigationScreen({ navigation }) {
           }
         }
 
+=======
+          speakNav(`${msg.text}. ${msg.dist}`)
+        }
+
+        // Arrived
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'arrived') {
           sessionActive.current = false
           totalDistKmRef.current = null
 
           speakNav('You have arrived at your destination')
+<<<<<<< HEAD
           await stopNavSession()
         }
 
+=======
+
+          await stopNavSession()
+        }
+
+        // Clear route
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'clear') {
           sessionActive.current = false
           totalDistKmRef.current = null
@@ -270,10 +350,18 @@ export default function NavigationScreen({ navigation }) {
           await stopNavSession()
         }
 
+<<<<<<< HEAD
+=======
+        // Helmet view toggled from WebView
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'helmetViewToggled') {
           setHelmetView(msg.active)
         }
 
+<<<<<<< HEAD
+=======
+        // Weather update
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
         if (msg.type === 'weatherUpdate') {
           weatherCodesRef.current = {
             startWmoCode: msg.startWmoCode ?? null,
@@ -284,16 +372,29 @@ export default function NavigationScreen({ navigation }) {
         console.warn('WebView message error:', e?.message)
       }
     },
+<<<<<<< HEAD
     [speakNav, voiceGuidance]
   )
 
+=======
+    [speakNav]
+  )
+
+  // ── Helmet connect / disconnect ─────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const sendHelmetConnected = useCallback(
     (helmetIp) => {
       if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
 
       HelmetUDP.sendDateTime(new Date())
+<<<<<<< HEAD
       HelmetMapStreamer.start(injectJS)
 
+=======
+
+      HelmetMapStreamer.start(injectJS)
+
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
       injectMessage({ type: 'helmetConnected' })
       enableHelmetView()
       setHelmetConnected(true)
@@ -311,6 +412,10 @@ export default function NavigationScreen({ navigation }) {
     setHelmetConnected(false)
   }, [injectMessage, disableHelmetView])
 
+<<<<<<< HEAD
+=======
+  // ── App background / foreground ─────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (
@@ -348,6 +453,10 @@ export default function NavigationScreen({ navigation }) {
     return () => sub.remove()
   }, [startGPS, injectJS])
 
+<<<<<<< HEAD
+=======
+  // ── Mount / unmount ─────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   useEffect(() => {
     const existing = getNavState()
 
@@ -363,6 +472,10 @@ export default function NavigationScreen({ navigation }) {
     }
   }, [])
 
+<<<<<<< HEAD
+=======
+  // ── Back handler ────────────────────────────────────────────────────────────
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   const handleBack = () => {
     if (sessionActive.current) {
       Alert.alert(
@@ -465,12 +578,16 @@ export default function NavigationScreen({ navigation }) {
           }
         }}
       >
+<<<<<<< HEAD
         <Text
           style={[
             styles.backBtnText,
             { fontSize: 24 * textScale },
           ]}
         >
+=======
+        <Text style={styles.backBtnText}>
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
           {helmetConnected ? '📡' : '📵'}
         </Text>
       </TouchableOpacity>
@@ -487,6 +604,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0a0c10',
+<<<<<<< HEAD
+=======
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#0a0c10',
+  },
+  gpsBadge: {
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   },
 
   containerDark: {
@@ -513,6 +648,10 @@ const styles = StyleSheet.create({
   gpsBadgeText: {
     color: ACCENT,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+<<<<<<< HEAD
+=======
+    fontSize: 11,
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
@@ -529,6 +668,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
+<<<<<<< HEAD
   },
 
   backBtnText: {
@@ -537,6 +677,15 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
 
+=======
+  },
+  backBtnText: {
+    color: ACCENT,
+    fontSize: 24,
+    lineHeight: 28,
+    marginTop: -2,
+  },
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
   debugBtn: {
     position: 'absolute',
     top: 12,
@@ -556,4 +705,10 @@ const styles = StyleSheet.create({
     borderColor: ACCENT,
   },
 })
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> c2cbe41c33815e7b6b5e40c374504cb550233b7c
 // npm install react-native-tts
