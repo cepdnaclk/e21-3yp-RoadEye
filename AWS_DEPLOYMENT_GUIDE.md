@@ -290,7 +290,7 @@ Edit `RoadEye/src/api/client.js` (or wherever API calls are):
 import axios from 'axios';
 import { API_URL } from '@env';
 
-const API_BASE_URL = API_URL || 'http://10.30.12.231:8080/api';
+const API_BASE_URL = API_URL || 'http://roadeye.eu-north-1.elasticbeanstalk.com/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
