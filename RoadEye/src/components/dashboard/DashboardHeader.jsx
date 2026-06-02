@@ -13,6 +13,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { colors } from '../../utils/theme'
 import HelmetConnectButton from './HelmetConnectButton'
 import { useHelmetConnection } from '../../hooks/useHelmetConnection'
+import { useAppSettings } from '../../hooks/useAppSettings'
 
 const C = colors
 
@@ -23,10 +24,10 @@ export default function DashboardHeader({
 }) {
   const { user } = useAuth()
   const navigation = useNavigation()
-
   const [dropdown, setDropdown] = useState(false)
 
   const helmet = useHelmetConnection()
+  const { darkMode, textScale } = useAppSettings()
 
   useEffect(() => {
     onConnectionChange?.(helmet.connectionState)
@@ -41,10 +42,7 @@ export default function DashboardHeader({
   const username = user?.username || 'User'
   const initial = (username?.[0] || 'U').toUpperCase()
 
-  // ── Current date ─────────────────────────────────────────────
-  const today = new Date()
-
-  const dateText = today
+  const dateText = new Date()
     .toLocaleDateString('en-US', {
       weekday: 'short',
       day: '2-digit',
@@ -52,14 +50,10 @@ export default function DashboardHeader({
     })
     .toUpperCase()
 
-  // ── Logout ───────────────────────────────────────────────────
   const handleLogout = () => {
     setDropdown(false)
-
     helmet.disconnect()
-
     onLogout()
-
     navigation.reset({
       index: 0,
       routes: [{ name: 'Login' }],
@@ -67,22 +61,34 @@ export default function DashboardHeader({
   }
 
   return (
-    <View style={styles.container}>
-      {/* ── Top row ─────────────────────────────────────────── */}
+    <View style={[styles.container, darkMode && styles.containerDark]}>
       <View style={styles.topRow}>
         <View>
-          <Text style={styles.greeting}>
+          <Text
+            style={[
+              styles.greeting,
+              { fontSize: 22 * textScale },
+              darkMode && styles.textWhite,
+            ]}
+          >
             Hi {username},
           </Text>
 
-          <Text style={styles.date}>
+          <Text
+            style={[
+              styles.date,
+              { fontSize: 11 * textScale },
+            ]}
+          >
             {dateText}
           </Text>
         </View>
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Text style={styles.iconText}>🔔</Text>
+            <Text style={[styles.iconText, { fontSize: 18 * textScale }]}>
+              🔔
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -90,17 +96,15 @@ export default function DashboardHeader({
             style={styles.avatar}
             activeOpacity={0.8}
           >
-            <Text style={styles.avatarText}>
+            <Text style={[styles.avatarText, { fontSize: 14 * textScale }]}>
               {initial}
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* ── Helmet connect ─────────────────────────────────── */}
       <HelmetConnectButton helmet={helmet} />
 
-      {/* ── Dropdown menu ──────────────────────────────────── */}
       <Modal
         visible={dropdown}
         transparent
@@ -112,23 +116,28 @@ export default function DashboardHeader({
           onPress={() => setDropdown(false)}
         >
           <Pressable
-            style={styles.menu}
+            style={[styles.menu, darkMode && styles.menuDark]}
             onPress={e => e.stopPropagation()}
           >
-            {/* Header */}
             <View style={styles.menuHeader}>
               <View style={styles.menuAvatar}>
-                <Text style={styles.menuAvatarText}>
+                <Text style={[styles.menuAvatarText, { fontSize: 16 * textScale }]}>
                   {initial}
                 </Text>
               </View>
 
               <View>
-                <Text style={styles.menuName}>
+                <Text
+                  style={[
+                    styles.menuName,
+                    { fontSize: 15 * textScale },
+                    darkMode && styles.textWhite,
+                  ]}
+                >
                   {username}
                 </Text>
 
-                <Text style={styles.menuEmail}>
+                <Text style={[styles.menuEmail, { fontSize: 12 * textScale }]}>
                   {user?.email || ''}
                 </Text>
               </View>
@@ -136,7 +145,6 @@ export default function DashboardHeader({
 
             <View style={styles.divider} />
 
-            {/* Change Profile */}
             <TouchableOpacity
               style={styles.menuItem}
               activeOpacity={0.7}
@@ -145,16 +153,19 @@ export default function DashboardHeader({
                 navigation.navigate('ChangeProfile')
               }}
             >
-              <Text style={styles.menuItemIcon}>👤</Text>
-
-              <Text style={styles.menuItemText}>
+              <Text style={[styles.menuItemIcon, { fontSize: 18 * textScale }]}>👤</Text>
+              <Text
+                style={[
+                  styles.menuItemText,
+                  { fontSize: 15 * textScale },
+                  darkMode && styles.textWhite,
+                ]}
+              >
                 Change Profile
               </Text>
-
-              <Text style={styles.menuArrow}>›</Text>
+              <Text style={[styles.menuArrow, { fontSize: 18 * textScale }]}>›</Text>
             </TouchableOpacity>
 
-            {/* Settings */}
             <TouchableOpacity
               style={styles.menuItem}
               activeOpacity={0.7}
@@ -163,38 +174,39 @@ export default function DashboardHeader({
                 navigation.navigate('Settings')
               }}
             >
-              <Text style={styles.menuItemIcon}>⚙️</Text>
-
-              <Text style={styles.menuItemText}>
+              <Text style={[styles.menuItemIcon, { fontSize: 18 * textScale }]}>⚙️</Text>
+              <Text
+                style={[
+                  styles.menuItemText,
+                  { fontSize: 15 * textScale },
+                  darkMode && styles.textWhite,
+                ]}
+              >
                 Settings
               </Text>
-
-              <Text style={styles.menuArrow}>›</Text>
+              <Text style={[styles.menuArrow, { fontSize: 18 * textScale }]}>›</Text>
             </TouchableOpacity>
 
             <View style={styles.divider} />
 
-            {/* Logout */}
             <TouchableOpacity
               style={styles.menuItem}
               onPress={handleLogout}
               activeOpacity={0.7}
             >
-              <Text style={styles.menuItemIcon}>🚪</Text>
-
+              <Text style={[styles.menuItemIcon, { fontSize: 18 * textScale }]}>🚪</Text>
               <Text
                 style={[
                   styles.menuItemText,
-                  { color: '#DC2626' },
+                  { color: '#DC2626', fontSize: 15 * textScale },
                 ]}
               >
                 Log Out
               </Text>
-
               <Text
                 style={[
                   styles.menuArrow,
-                  { color: '#DC2626' },
+                  { color: '#DC2626', fontSize: 18 * textScale },
                 ]}
               >
                 ›
@@ -213,41 +225,33 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 16,
   },
-
+  containerDark: {
+    backgroundColor: '#1f2937',
+  },
   topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 14,
   },
-
   greeting: {
-    fontSize: 22,
     fontWeight: '800',
     color: C.text,
   },
-
   date: {
-    fontSize: 11,
     color: C.muted,
     fontWeight: '500',
     letterSpacing: 1,
   },
-
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
   },
-
   iconBtn: {
     padding: 2,
   },
-
-  iconText: {
-    fontSize: 18,
-  },
-
+  iconText: {},
   avatar: {
     width: 36,
     height: 36,
@@ -256,105 +260,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   avatarText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 14,
   },
-
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-
   menu: {
     position: 'absolute',
     top: 70,
     right: 16,
     width: 240,
-
     backgroundColor: '#fff',
     borderRadius: 16,
-
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.15,
     shadowRadius: 20,
     elevation: 10,
-
     overflow: 'hidden',
   },
-
+  menuDark: {
+    backgroundColor: '#1f2937',
+  },
   menuHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     padding: 16,
   },
-
   menuAvatar: {
     width: 42,
     height: 42,
     borderRadius: 21,
-
     backgroundColor: '#f97316',
-
     alignItems: 'center',
     justifyContent: 'center',
   },
-
   menuAvatarText: {
     color: '#fff',
     fontWeight: '800',
-    fontSize: 16,
   },
-
   menuName: {
-    fontSize: 15,
     fontWeight: '800',
     color: C.text,
   },
-
   menuEmail: {
-    fontSize: 12,
     color: C.muted,
     marginTop: 2,
   },
-
   divider: {
     height: 1,
     backgroundColor: '#F3F4F6',
   },
-
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-
     paddingHorizontal: 16,
     paddingVertical: 14,
-
     gap: 12,
   },
-
   menuItemIcon: {
-    fontSize: 18,
     width: 24,
   },
-
   menuItemText: {
     flex: 1,
-    fontSize: 15,
     fontWeight: '600',
     color: C.text,
   },
-
   menuArrow: {
-    fontSize: 18,
     color: C.muted,
+  },
+  textWhite: {
+    color: '#fff',
   },
 })

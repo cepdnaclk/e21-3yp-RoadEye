@@ -2,9 +2,16 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react'
 import {
-  View, StyleSheet, Platform, StatusBar,
-  Text, TouchableOpacity, Alert, AppState,
+  View,
+  StyleSheet,
+  Platform,
+  StatusBar,
+  Text,
+  TouchableOpacity,
+  Alert,
+  AppState,
 } from 'react-native'
+
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
 import Tts from 'react-native-tts'
@@ -24,16 +31,18 @@ import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 import { useAuth } from '../hooks/useAuth'
+import { useAppSettings } from '../hooks/useAppSettings'
 import { getESP32IP } from '../utils/ESP32Discovery'
 
 export default function NavigationScreen({ navigation }) {
   const { userId, token } = useAuth()
+  const { darkMode, textScale, voiceGuidance } = useAppSettings()
 
-  const webViewRef    = useRef(null)
-  const locationSub   = useRef(null)
-  const appStateRef   = useRef(AppState.currentState)
+  const webViewRef = useRef(null)
+  const locationSub = useRef(null)
+  const appStateRef = useRef(AppState.currentState)
   const sessionActive = useRef(false)
-  const webViewReady  = useRef(false)
+  const webViewReady = useRef(false)
 
   const totalDistKmRef = useRef(null)
   const weatherCodesRef = useRef({
@@ -46,7 +55,6 @@ export default function NavigationScreen({ navigation }) {
     HelmetMapStreamer.isActive()
   )
 
-  // ── TTS setup ───────────────────────────────────────────────────────────────
   useEffect(() => {
     Tts.setDefaultLanguage('en-US')
     Tts.setDefaultRate(0.45)
@@ -57,13 +65,16 @@ export default function NavigationScreen({ navigation }) {
     }
   }, [])
 
-  const speakNav = useCallback((text) => {
-    if (!text) return
-    Tts.stop()
-    Tts.speak(text)
-  }, [])
+  const speakNav = useCallback(
+    (text) => {
+      if (!text || voiceGuidance === 'Off') return
 
-  // ── Inject helpers ──────────────────────────────────────────────────────────
+      Tts.stop()
+      Tts.speak(text)
+    },
+    [voiceGuidance]
+  )
+
   const injectMessage = useCallback((data) => {
     if (!webViewReady.current) return
 
@@ -84,7 +95,6 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(jsString)
   }, [])
 
-  // ── Helmet view helpers ─────────────────────────────────────────────────────
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
@@ -95,7 +105,6 @@ export default function NavigationScreen({ navigation }) {
     setHelmetView(false)
   }, [injectMessage])
 
-  // ── GPS ─────────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
 
@@ -145,7 +154,6 @@ export default function NavigationScreen({ navigation }) {
     )
   }, [injectMessage, navigation, userId, token])
 
-  // ── WebView ready ───────────────────────────────────────────────────────────
   const onWebViewLoad = useCallback(() => {
     webViewReady.current = true
 
@@ -189,19 +197,16 @@ export default function NavigationScreen({ navigation }) {
     startGPS()
   }, [startGPS, injectMessage, enableHelmetView, injectJS])
 
-  // ── WebView messages ────────────────────────────────────────────────────────
   const onWebViewMessage = useCallback(
     async (event) => {
       try {
         const msg = JSON.parse(event.nativeEvent.data)
 
-        // Map frame from HelmetMapStreamer canvas capture
         if (msg.type === '__mapFrame') {
           if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
           return
         }
 
-        // Route created
         if (msg.type === 'route') {
           sessionActive.current = true
           totalDistKmRef.current = msg.distKm
@@ -225,7 +230,6 @@ export default function NavigationScreen({ navigation }) {
           speakNav(`Navigation started to ${msg.destination}`)
         }
 
-        // Turn-by-turn step
         if (msg.type === 'step') {
           updateNavStep({
             arrow: msg.arrow,
@@ -237,20 +241,27 @@ export default function NavigationScreen({ navigation }) {
             updateNavDist(msg.distKm)
           }
 
-          speakNav(`${msg.text}. ${msg.dist}`)
+          if (voiceGuidance === 'Full navigation voice') {
+            speakNav(`${msg.text}. ${msg.dist}`)
+          }
+
+          if (
+            voiceGuidance === 'Important turns only' &&
+            msg.text &&
+            !msg.text.toLowerCase().includes('continue')
+          ) {
+            speakNav(`${msg.text}. ${msg.dist}`)
+          }
         }
 
-        // Arrived
         if (msg.type === 'arrived') {
           sessionActive.current = false
           totalDistKmRef.current = null
 
           speakNav('You have arrived at your destination')
-
           await stopNavSession()
         }
 
-        // Clear route
         if (msg.type === 'clear') {
           sessionActive.current = false
           totalDistKmRef.current = null
@@ -259,12 +270,10 @@ export default function NavigationScreen({ navigation }) {
           await stopNavSession()
         }
 
-        // Helmet view toggled from WebView
         if (msg.type === 'helmetViewToggled') {
           setHelmetView(msg.active)
         }
 
-        // Weather update
         if (msg.type === 'weatherUpdate') {
           weatherCodesRef.current = {
             startWmoCode: msg.startWmoCode ?? null,
@@ -275,16 +284,14 @@ export default function NavigationScreen({ navigation }) {
         console.warn('WebView message error:', e?.message)
       }
     },
-    [speakNav]
+    [speakNav, voiceGuidance]
   )
 
-  // ── Helmet connect / disconnect ─────────────────────────────────────────────
   const sendHelmetConnected = useCallback(
     (helmetIp) => {
       if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
 
       HelmetUDP.sendDateTime(new Date())
-
       HelmetMapStreamer.start(injectJS)
 
       injectMessage({ type: 'helmetConnected' })
@@ -304,7 +311,6 @@ export default function NavigationScreen({ navigation }) {
     setHelmetConnected(false)
   }, [injectMessage, disableHelmetView])
 
-  // ── App background / foreground ─────────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
       if (
@@ -342,7 +348,6 @@ export default function NavigationScreen({ navigation }) {
     return () => sub.remove()
   }, [startGPS, injectJS])
 
-  // ── Mount / unmount ─────────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
 
@@ -358,7 +363,6 @@ export default function NavigationScreen({ navigation }) {
     }
   }, [])
 
-  // ── Back handler ────────────────────────────────────────────────────────────
   const handleBack = () => {
     if (sessionActive.current) {
       Alert.alert(
@@ -400,7 +404,7 @@ export default function NavigationScreen({ navigation }) {
   })
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, darkMode && styles.containerDark]}>
       <StatusBar hidden />
 
       <WebView
@@ -419,12 +423,26 @@ export default function NavigationScreen({ navigation }) {
 
       {gpsStatus !== 'GPS ✓' && (
         <View style={styles.gpsBadge} pointerEvents="none">
-          <Text style={styles.gpsBadgeText}>{gpsStatus}</Text>
+          <Text
+            style={[
+              styles.gpsBadgeText,
+              { fontSize: 11 * textScale },
+            ]}
+          >
+            {gpsStatus}
+          </Text>
         </View>
       )}
 
       <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-        <Text style={styles.backBtnText}>‹</Text>
+        <Text
+          style={[
+            styles.backBtnText,
+            { fontSize: 24 * textScale },
+          ]}
+        >
+          ‹
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -447,7 +465,12 @@ export default function NavigationScreen({ navigation }) {
           }
         }}
       >
-        <Text style={styles.backBtnText}>
+        <Text
+          style={[
+            styles.backBtnText,
+            { fontSize: 24 * textScale },
+          ]}
+        >
           {helmetConnected ? '📡' : '📵'}
         </Text>
       </TouchableOpacity>
@@ -465,10 +488,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0a0c10',
   },
+
+  containerDark: {
+    backgroundColor: '#111827',
+  },
+
   webview: {
     flex: 1,
     backgroundColor: '#0a0c10',
   },
+
   gpsBadge: {
     position: 'absolute',
     top: 80,
@@ -480,13 +509,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
+
   gpsBadgeText: {
     color: ACCENT,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 11,
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
+
   backBtn: {
     position: 'absolute',
     top: 12,
@@ -500,12 +530,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   backBtnText: {
     color: ACCENT,
-    fontSize: 24,
     lineHeight: 28,
     marginTop: -2,
   },
+
   debugBtn: {
     position: 'absolute',
     top: 12,
@@ -519,12 +550,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+
   debugBtnActive: {
     backgroundColor: ACTIVE,
     borderColor: ACCENT,
   },
 })
-
-
-
 // npm install react-native-tts
