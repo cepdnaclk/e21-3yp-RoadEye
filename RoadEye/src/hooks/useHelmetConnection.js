@@ -16,7 +16,7 @@ const CFG = {
   reconnectAttempts:  3,
   reconnectDelay:     2000,
   connectionTimeout:  6000,
-  pingInterval:       3000,
+  pingInterval:       5000,
 }
 
 export function useHelmetConnection() {
@@ -25,8 +25,7 @@ export function useHelmetConnection() {
   const [error, setError]                     = useState(null)
   const [signal, setSignal]                   = useState(0)
   const [log, setLog]                         = useState([])
-  const [helmetIp, setHelmetIp]               = useState('192.168.137.210')
-
+  const [helmetIp, setHelmetIp]               = useState('')
   const mountedRef         = useRef(true)
   const reconnectCount     = useRef(0)
   const connectTimeoutRef  = useRef(null)
@@ -36,7 +35,7 @@ export function useHelmetConnection() {
   const sensorRef          = useRef({})
   const imuRef             = useRef({})
   const connectionStateRef = useRef(HELMET_STATE.DISCONNECTED)
-  const helmetIpRef        = useRef('192.168.137.10')
+  const helmetIpRef        = useRef('')
 
   // Keep refs in sync — never put these in dep arrays
   useEffect(() => { connectionStateRef.current = connectionState }, [connectionState])

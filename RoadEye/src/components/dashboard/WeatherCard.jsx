@@ -1,4 +1,5 @@
 // src/components/dashboard/WeatherCard.jsx
+
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native'
 import * as Location from 'expo-location'
@@ -6,11 +7,13 @@ import { colors } from '../../utils/theme'
 import {
   registerDestWeatherListener,
   unregisterDestWeatherListener,
+  setNavWeather,
 } from '../../utils/NavigationSession'
+import HelmetUDP, { WeatherIcon } from '../../utils/HelmetUDP'
 
 const C = colors
 
-// ── Open-Meteo — free, no API key ─────────────────────────────────────────
+// ── Open-Meteo — free, no API key ─────────────────────────────────────────────
 const fetchWeather = async (lat, lng) => {
   const url =
     `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
@@ -24,7 +27,7 @@ const fetchWeather = async (lat, lng) => {
     temp:     Math.round(c.temperature_2m),
     humidity: c.relative_humidity_2m,
     wind:     Math.round(c.wind_speed_10m),
-    code:     c.weather_code,
+    code:     c.weather_code,           // raw WMO code — forwarded to HelmetUDP
     high:     Math.round(d.temperature_2m_max[0]),
     low:      Math.round(d.temperature_2m_min[0]),
   }
@@ -40,20 +43,34 @@ const reverseGeocode = async (lat, lng) => {
   } catch { return 'Your Location' }
 }
 
+// ── WMO code → display icon + label ───────────────────────────────────────────
 const wmoIcon = (code) => {
-  if (code === 0)   return { icon: '☀️',  label: 'Clear' }
-  if (code <= 2)    return { icon: '🌤️', label: 'Partly Cloudy' }
-  if (code === 3)   return { icon: '☁️',  label: 'Overcast' }
-  if (code <= 49)   return { icon: '🌫️', label: 'Foggy' }
-  if (code <= 59)   return { icon: '🌦️', label: 'Drizzle' }
-  if (code <= 69)   return { icon: '🌧️', label: 'Rain' }
-  if (code <= 79)   return { icon: '❄️',  label: 'Snow' }
-  if (code <= 84)   return { icon: '🌧️', label: 'Showers' }
-  if (code <= 94)   return { icon: '⛈️',  label: 'Thunderstorm' }
-  return                   { icon: '⛈️',  label: 'Storm' }
+  if (code === 0)  return { icon: '☀️',  label: 'Clear' }
+  if (code <= 2)   return { icon: '🌤️', label: 'Partly Cloudy' }
+  if (code === 3)  return { icon: '☁️',  label: 'Overcast' }
+  if (code <= 49)  return { icon: '🌫️', label: 'Foggy' }
+  if (code <= 59)  return { icon: '🌦️', label: 'Drizzle' }
+  if (code <= 69)  return { icon: '🌧️', label: 'Rain' }
+  if (code <= 79)  return { icon: '❄️',  label: 'Snow' }
+  if (code <= 84)  return { icon: '🌧️', label: 'Showers' }
+  if (code <= 94)  return { icon: '⛈️',  label: 'Thunderstorm' }
+  return                  { icon: '⛈️',  label: 'Storm' }
 }
 
-// ── COMPONENT ─────────────────────────────────────────────────────────────
+// ── WMO code → PCLink WeatherIcon constant (1=sunny 2=cloudy 3=rain) ──────────
+// Mirrors wmoToWeatherIcon() in NavigationSession.js and speedApi.js.
+function wmoToWeatherIcon(code) {
+  if (code == null) return WeatherIcon.SUNNY
+  if (code <= 2)    return WeatherIcon.SUNNY
+  if (code === 3)   return WeatherIcon.CLOUDY
+  if (code <= 49)   return WeatherIcon.CLOUDY
+  if (code <= 69)   return WeatherIcon.RAIN
+  if (code <= 79)   return WeatherIcon.CLOUDY
+  if (code <= 94)   return WeatherIcon.RAIN
+  return                   WeatherIcon.RAIN
+}
+
+// ── COMPONENT ──────────────────────────────────────────────────────────────────
 export default function WeatherCard() {
   const [origin,      setOrigin]      = useState(null)
   const [dest,        setDest]        = useState(null)
@@ -61,18 +78,46 @@ export default function WeatherCard() {
   const [destLoading, setDestLoading] = useState(false)
   const refreshTimer = useRef(null)
 
-  // ── Register with NavigationSession so stop/start both reach us ──────────
+  // Keep a ref to latest origin so the dest-weather callback can read it
+  // when pushing combined WMO codes to NavigationSession.
+  const originRef = useRef(null)
+
+  // ── Push weather to helmet (PKT_WEATHER) and NavigationSession ─────────────
+  // Called whenever origin or dest weather is refreshed.
+  const pushWeatherToHelmet = (originData, destData) => {
+    // PKT_WEATHER — local ambient conditions sent to the helmet display
+    if (originData && HelmetUDP.hasPeerIP()) {
+      HelmetUDP.sendWeather({
+        tempC:       originData.temp,
+        humidity:    originData.humidity,
+        weatherIcon: wmoToWeatherIcon(originData.code),
+      })
+    }
+
+    // Forward WMO codes to NavigationSession so PKT_NAVIGATION startWeather /
+    // destWeather fields stay in sync with what WeatherCard is showing.
+    setNavWeather({
+      startWmoCode: originData?.code ?? null,
+      destWmoCode:  destData?.code   ?? null,
+    })
+  }
+
+  // ── Register with NavigationSession — destination weather ──────────────────
   useEffect(() => {
     registerDestWeatherListener(async (target) => {
       if (!target) {
         setDest(null)
         setDestLoading(false)
+        // Clear dest WMO code in NavigationSession
+        setNavWeather({ startWmoCode: originRef.current?.code ?? null, destWmoCode: null })
         return
       }
       setDestLoading(true)
       try {
         const w = await fetchWeather(target.lat, target.lng)
-        setDest({ ...w, name: target.name || 'Destination' })
+        const destData = { ...w, name: target.name || 'Destination' }
+        setDest(destData)
+        pushWeatherToHelmet(originRef.current, destData)
       } catch {
         setDest(null)
       } finally {
@@ -82,21 +127,29 @@ export default function WeatherCard() {
     return () => unregisterDestWeatherListener()
   }, [])
 
-  // ── Origin weather (live location, refreshes every 1 min) ────────────────
+  // ── Origin weather (live location, refreshes every 1 min) ──────────────────
   const loadOrigin = async () => {
     try {
       const { status } = await Location.requestForegroundPermissionsAsync()
       if (status !== 'granted') {
-        setOrigin({ temp: '--', humidity: '--', wind: '--', code: 0, high: '--', low: '--', name: 'Location denied' })
+        const fallback = { temp: '--', humidity: '--', wind: '--', code: 0, high: '--', low: '--', name: 'Location denied' }
+        setOrigin(fallback)
+        originRef.current = fallback
         setLoading(false)
         return
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
       const { latitude: lat, longitude: lng } = loc.coords
       const [w, name] = await Promise.all([fetchWeather(lat, lng), reverseGeocode(lat, lng)])
-      setOrigin({ ...w, name })
+      const originData = { ...w, name }
+      setOrigin(originData)
+      originRef.current = originData
+      // Push fresh origin weather to helmet and NavigationSession
+      pushWeatherToHelmet(originData, dest)
     } catch {
-      setOrigin({ temp: '--', humidity: '--', wind: '--', code: 0, high: '--', low: '--', name: 'Unavailable' })
+      const fallback = { temp: '--', humidity: '--', wind: '--', code: 0, high: '--', low: '--', name: 'Unavailable' }
+      setOrigin(fallback)
+      originRef.current = fallback
     } finally {
       setLoading(false)
     }
@@ -108,7 +161,7 @@ export default function WeatherCard() {
     return () => clearInterval(refreshTimer.current)
   }, [])
 
-  // ── Loading state ─────────────────────────────────────────────────────────
+  // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
     return (
       <View style={[styles.card, styles.loadingCard]}>
@@ -120,7 +173,7 @@ export default function WeatherCard() {
 
   const hasDest = !!dest || destLoading
 
-  // ── No destination: full-width single card ────────────────────────────────
+  // ── No destination: full-width single card ──────────────────────────────────
   if (!hasDest) {
     return (
       <View style={styles.card}>
@@ -129,7 +182,7 @@ export default function WeatherCard() {
     )
   }
 
-  // ── Destination active: split two-column card ─────────────────────────────
+  // ── Destination active: split two-column card ───────────────────────────────
   return (
     <View style={styles.card}>
       <SplitWeatherBlock data={origin} label="MY LOCATION" accent="#5B47E0" />
@@ -146,7 +199,7 @@ export default function WeatherCard() {
   )
 }
 
-// ── Full-width block ──────────────────────────────────────────────────────────
+// ── Full-width block ───────────────────────────────────────────────────────────
 function FullWeatherBlock({ data }) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
@@ -179,7 +232,7 @@ function FullWeatherBlock({ data }) {
   )
 }
 
-// ── Compact split block ───────────────────────────────────────────────────────
+// ── Compact split block ────────────────────────────────────────────────────────
 function SplitWeatherBlock({ data, label, accent }) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
@@ -202,7 +255,7 @@ function SplitWeatherBlock({ data, label, accent }) {
   )
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+// ── Styles ─────────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   card: {
     backgroundColor: C.white,
@@ -214,31 +267,31 @@ const styles = StyleSheet.create({
   loadingCard:  { justifyContent: 'center', gap: 10, minHeight: 80 },
   loadingText:  { fontSize: 12, color: C.muted },
 
-  fullBlock:    { flex: 1, flexDirection: 'row', alignItems: 'center' },
-  fullLeft:     { marginRight: 4 },
-  fullTemp:     { fontSize: 32, fontWeight: '800', color: C.text, lineHeight: 36 },
-  fullUnit:     { fontSize: 11, color: C.muted },
-  fullCondition:{ fontSize: 12, fontWeight: '600', color: C.text, marginTop: 4 },
-  fullRange:    { fontSize: 10, color: C.muted },
-  fullMeta:     { flex: 1, paddingLeft: 20, gap: 6 },
-  fullMetaRow:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  fullMetaLabel:{ fontSize: 12, fontWeight: '600', color: C.text },
-  fullMetaVal:  { fontSize: 12, fontWeight: '700', color: C.text, marginLeft: 'auto' },
-  fullLocation: { fontSize: 10, color: C.muted, marginTop: 6 },
-  fullIconBox:  { width: 52, height: 52, borderRadius: 14, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
-  fullIcon:     { fontSize: 26 },
+  fullBlock:     { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  fullLeft:      { marginRight: 4 },
+  fullTemp:      { fontSize: 32, fontWeight: '800', color: C.text, lineHeight: 36 },
+  fullUnit:      { fontSize: 11, color: C.muted },
+  fullCondition: { fontSize: 12, fontWeight: '600', color: C.text, marginTop: 4 },
+  fullRange:     { fontSize: 10, color: C.muted },
+  fullMeta:      { flex: 1, paddingLeft: 20, gap: 6 },
+  fullMetaRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  fullMetaLabel: { fontSize: 12, fontWeight: '600', color: C.text },
+  fullMetaVal:   { fontSize: 12, fontWeight: '700', color: C.text, marginLeft: 'auto' },
+  fullLocation:  { fontSize: 10, color: C.muted, marginTop: 6 },
+  fullIconBox:   { width: 52, height: 52, borderRadius: 14, backgroundColor: '#FFF7ED', alignItems: 'center', justifyContent: 'center', marginLeft: 12 },
+  fullIcon:      { fontSize: 26 },
 
-  splitBlock:    { flex: 1, paddingHorizontal: 4 },
-  splitLabel:    { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 },
-  splitLocation: { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 5 },
-  splitTempRow:  { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginBottom: 2 },
-  splitIcon:     { fontSize: 22, lineHeight: 30 },
-  splitTemp:     { fontSize: 28, fontWeight: '800', color: C.text, lineHeight: 32 },
-  splitUnit:     { fontSize: 10, color: C.muted, marginBottom: 3 },
-  splitCondition:{ fontSize: 11, fontWeight: '600', color: C.text },
-  splitRange:    { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 5 },
-  splitMeta:     { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
-  splitMetaItem: { fontSize: 10, color: C.text, fontWeight: '500' },
+  splitBlock:     { flex: 1, paddingHorizontal: 4 },
+  splitLabel:     { fontSize: 9, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 2 },
+  splitLocation:  { fontSize: 10, fontWeight: '600', color: C.muted, marginBottom: 5 },
+  splitTempRow:   { flexDirection: 'row', alignItems: 'flex-end', gap: 3, marginBottom: 2 },
+  splitIcon:      { fontSize: 22, lineHeight: 30 },
+  splitTemp:      { fontSize: 28, fontWeight: '800', color: C.text, lineHeight: 32 },
+  splitUnit:      { fontSize: 10, color: C.muted, marginBottom: 3 },
+  splitCondition: { fontSize: 11, fontWeight: '600', color: C.text },
+  splitRange:     { fontSize: 10, color: C.muted, marginTop: 1, marginBottom: 5 },
+  splitMeta:      { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
+  splitMetaItem:  { fontSize: 10, color: C.text, fontWeight: '500' },
 
   divider: { width: 1, alignSelf: 'stretch', backgroundColor: '#E5E7EB', marginHorizontal: 8 },
 

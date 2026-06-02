@@ -5,7 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 // iOS simulator     → 'http://localhost:8080'
 // Physical device   → 'http://<YOUR_PC_LAN_IP>:8080'
 const BASE_URL = 'http://10.30.12.231:8081'
+
 // ───────────────────────────────────────────────────────────────────────────
+
 
 /**
  * Authenticated fetch wrapper.
@@ -29,6 +31,26 @@ export async function apiFetch(path, options = {}) {
   const response = await fetch(`${BASE_URL}${path}`, {
     ...options,
     headers,
+  })
+
+  const data = await response.json()
+
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed: ${response.status}`)
+  }
+
+  return data
+}
+export async function apiMultipart(path, formData, method = 'PUT') {
+  const token = await AsyncStorage.getItem('jwt_token')
+
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // Do NOT set Content-Type for FormData
+    },
+    body: formData,
   })
 
   const data = await response.json()

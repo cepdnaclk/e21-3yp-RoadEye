@@ -7,35 +7,66 @@ import {
 } from 'react-native'
 import { WebView } from 'react-native-webview'
 import * as Location from 'expo-location'
+import Tts from 'react-native-tts'
+
 import {
   startNavSession,
   stopNavSession,
   updateNavStep,
   updateNavSpeed,
+  updateNavDist,
   getNavState,
   setDestinationWeatherTarget,
   setHelmetView,
 } from '../utils/NavigationSession'
+
 import HelmetUDP from '../utils/HelmetUDP'
 import HelmetMapStreamer from '../utils/HelmetMapStreamer'
-
-const ESP32_IP = '192.168.137.210'
+import { sendSpeedEvent } from '../api/speedApi'
+import { useAuth } from '../hooks/useAuth'
+import { getESP32IP } from '../utils/ESP32Discovery'
 
 export default function NavigationScreen({ navigation }) {
+  const { userId, token } = useAuth()
+
   const webViewRef    = useRef(null)
   const locationSub   = useRef(null)
   const appStateRef   = useRef(AppState.currentState)
   const sessionActive = useRef(false)
   const webViewReady  = useRef(false)
 
-  const [gpsStatus,       setGpsStatus]       = useState('Acquiring GPS…')
-  const [helmetConnected, setHelmetConnected] = useState(HelmetMapStreamer.isActive())
-  // ↑ initialise from streamer so button shows correct icon when returning
-  //   to this screen while streaming was already running
+  const totalDistKmRef = useRef(null)
+  const weatherCodesRef = useRef({
+    startWmoCode: null,
+    destWmoCode: null,
+  })
 
-  // ── Inject helpers ────────────────────────────────────────────────────────
+  const [gpsStatus, setGpsStatus] = useState('Acquiring GPS…')
+  const [helmetConnected, setHelmetConnected] = useState(
+    HelmetMapStreamer.isActive()
+  )
+
+  // ── TTS setup ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    Tts.setDefaultLanguage('en-US')
+    Tts.setDefaultRate(0.45)
+    Tts.setDefaultPitch(1.0)
+
+    return () => {
+      Tts.stop()
+    }
+  }, [])
+
+  const speakNav = useCallback((text) => {
+    if (!text) return
+    Tts.stop()
+    Tts.speak(text)
+  }, [])
+
+  // ── Inject helpers ──────────────────────────────────────────────────────────
   const injectMessage = useCallback((data) => {
     if (!webViewReady.current) return
+
     const script = `
       try {
         window.dispatchEvent(new MessageEvent('message', {
@@ -44,6 +75,7 @@ export default function NavigationScreen({ navigation }) {
       } catch(e) {}
       true;
     `
+
     webViewRef.current?.injectJavaScript(script)
   }, [])
 
@@ -52,201 +84,281 @@ export default function NavigationScreen({ navigation }) {
     webViewRef.current?.injectJavaScript(jsString)
   }, [])
 
-  // ── Helmet view helpers ───────────────────────────────────────────────────
+  // ── Helmet view helpers ─────────────────────────────────────────────────────
   const enableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: true })
     setHelmetView(true)
-    HelmetUDP.send({ type: 'helmetViewActive', theme: 'dark' })
   }, [injectMessage])
 
   const disableHelmetView = useCallback(() => {
     injectMessage({ type: 'helmetView', active: false })
     setHelmetView(false)
-    HelmetUDP.send({ type: 'helmetViewActive', theme: 'normal' })
   }, [injectMessage])
 
-  // ── GPS ───────────────────────────────────────────────────────────────────
+  // ── GPS ─────────────────────────────────────────────────────────────────────
   const startGPS = useCallback(async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
+
     if (status !== 'granted') {
-      Alert.alert('Location Permission', 'GPS permission is required for navigation.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ])
+      Alert.alert(
+        'Location Permission',
+        'GPS permission is required for navigation.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      )
       return
     }
+
     setGpsStatus('GPS acquiring…')
     locationSub.current?.remove()
+
     locationSub.current = await Location.watchPositionAsync(
-      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
+      {
+        accuracy: Location.Accuracy.BestForNavigation,
+        timeInterval: 1000,
+        distanceInterval: 5,
+      },
       (loc) => {
-        const { latitude, longitude, speed, heading } = loc.coords
+        const { latitude, longitude, speed } = loc.coords
         const speedKmh = speed ? Math.round(speed * 3.6) : 0
+
         setGpsStatus('GPS ✓')
         updateNavSpeed(speedKmh)
-        injectMessage({ type: 'gps', lat: latitude, lng: longitude, speed: speedKmh })
-        HelmetUDP.send({
-          type:    'gps',
-          lat:     latitude,
-          lng:     longitude,
-          speed:   speedKmh,
-          heading: heading ?? 0,
+
+        injectMessage({
+          type: 'gps',
+          lat: latitude,
+          lng: longitude,
+          speed: speedKmh,
         })
+
+        sendSpeedEvent(
+          {
+            speed: speedKmh,
+            userId,
+            totalDistKm: totalDistKmRef.current,
+            startWmoCode: weatherCodesRef.current.startWmoCode,
+            destWmoCode: weatherCodesRef.current.destWmoCode,
+          },
+          token
+        )
       }
     )
-  }, [injectMessage])
+  }, [injectMessage, navigation, userId, token])
 
-  // ── WebView ready ─────────────────────────────────────────────────────────
+  // ── WebView ready ───────────────────────────────────────────────────────────
   const onWebViewLoad = useCallback(() => {
     webViewReady.current = true
 
-    // If streamer was already running before we left the screen,
-    // hand it the fresh injectJS reference so it resumes sending frames
     if (HelmetMapStreamer.isActive()) {
       HelmetMapStreamer.updateInject(injectJS)
     }
 
     const existing = getNavState()
+
     if (existing.active && existing.destination) {
       sessionActive.current = true
+      totalDistKmRef.current = existing.totalDistKm ?? existing.distKm
+
+      weatherCodesRef.current = {
+        startWmoCode: existing.startWmoCode ?? null,
+        destWmoCode: existing.destWmoCode ?? null,
+      }
+
       setDestinationWeatherTarget({
-        lat:  existing.destination.lat,
-        lng:  existing.destination.lng,
+        lat: existing.destination.lat,
+        lng: existing.destination.lng,
         name: existing.destination.name,
       })
+
       setTimeout(() => {
         injectMessage({
-          type:        'restoreRoute',
+          type: 'restoreRoute',
           destination: existing.destination.name,
-          destLat:     existing.destination.lat,
-          destLng:     existing.destination.lng,
-          distKm:      existing.distKm,
-          etaMin:      existing.etaMin,
+          destLat: existing.destination.lat,
+          destLng: existing.destination.lng,
+          distKm: existing.distKm,
+          etaMin: existing.etaMin,
         })
-        HelmetUDP.send({
-          type:        'route',
-          destination: existing.destination.name,
-          destLat:     existing.destination.lat,
-          destLng:     existing.destination.lng,
-          distKm:      existing.distKm,
-          etaMin:      existing.etaMin,
-        })
+
         if (existing.helmetView) {
           setTimeout(() => enableHelmetView(), 800)
         }
       }, 500)
     }
+
     startGPS()
   }, [startGPS, injectMessage, enableHelmetView, injectJS])
 
-  // ── WebView messages ──────────────────────────────────────────────────────
-  const onWebViewMessage = useCallback(async (event) => {
-    try {
-      const msg = JSON.parse(event.nativeEvent.data)
+  // ── WebView messages ────────────────────────────────────────────────────────
+  const onWebViewMessage = useCallback(
+    async (event) => {
+      try {
+        const msg = JSON.parse(event.nativeEvent.data)
 
-      if (msg.type === '__mapFrame') {
-        if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
-        return
+        // Map frame from HelmetMapStreamer canvas capture
+        if (msg.type === '__mapFrame') {
+          if (msg.b64) HelmetMapStreamer.ingestFrame(msg.b64)
+          return
+        }
+
+        // Route created
+        if (msg.type === 'route') {
+          sessionActive.current = true
+          totalDistKmRef.current = msg.distKm
+
+          await startNavSession({
+            destination: {
+              name: msg.destination,
+              lat: msg.destLat,
+              lng: msg.destLng,
+            },
+            distKm: msg.distKm,
+            etaMin: msg.etaMin,
+          })
+
+          setDestinationWeatherTarget({
+            lat: msg.destLat,
+            lng: msg.destLng,
+            name: msg.destination,
+          })
+
+          speakNav(`Navigation started to ${msg.destination}`)
+        }
+
+        // Turn-by-turn step
+        if (msg.type === 'step') {
+          updateNavStep({
+            arrow: msg.arrow,
+            text: msg.text,
+            dist: msg.dist,
+          })
+
+          if (msg.distKm != null) {
+            updateNavDist(msg.distKm)
+          }
+
+          speakNav(`${msg.text}. ${msg.dist}`)
+        }
+
+        // Arrived
+        if (msg.type === 'arrived') {
+          sessionActive.current = false
+          totalDistKmRef.current = null
+
+          speakNav('You have arrived at your destination')
+
+          await stopNavSession()
+        }
+
+        // Clear route
+        if (msg.type === 'clear') {
+          sessionActive.current = false
+          totalDistKmRef.current = null
+
+          Tts.stop()
+          await stopNavSession()
+        }
+
+        // Helmet view toggled from WebView
+        if (msg.type === 'helmetViewToggled') {
+          setHelmetView(msg.active)
+        }
+
+        // Weather update
+        if (msg.type === 'weatherUpdate') {
+          weatherCodesRef.current = {
+            startWmoCode: msg.startWmoCode ?? null,
+            destWmoCode: msg.destWmoCode ?? null,
+          }
+        }
+      } catch (e) {
+        console.warn('WebView message error:', e?.message)
       }
+    },
+    [speakNav]
+  )
 
-      if (msg.type === 'route') {
-        sessionActive.current = true
-        await startNavSession({
-          destination: { name: msg.destination, lat: msg.destLat, lng: msg.destLng },
-          distKm: msg.distKm,
-          etaMin: msg.etaMin,
-        })
-        setDestinationWeatherTarget({ lat: msg.destLat, lng: msg.destLng, name: msg.destination })
-        HelmetUDP.send({
-          type:        'route',
-          destination: msg.destination,
-          destLat:     msg.destLat,
-          destLng:     msg.destLng,
-          distKm:      msg.distKm,
-          etaMin:      msg.etaMin,
-        })
-      }
+  // ── Helmet connect / disconnect ─────────────────────────────────────────────
+  const sendHelmetConnected = useCallback(
+    (helmetIp) => {
+      if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
 
-      if (msg.type === 'step') {
-        updateNavStep({ arrow: msg.arrow, text: msg.text, dist: msg.dist })
-        HelmetUDP.send({ type: 'step', arrow: msg.arrow, text: msg.text, dist: msg.dist })
-      }
+      HelmetUDP.sendDateTime(new Date())
 
-      if (msg.type === 'clear' || msg.type === 'arrived') {
-        sessionActive.current = false
-        await stopNavSession()
-        HelmetUDP.send({ type: 'clear' })
-      }
+      HelmetMapStreamer.start(injectJS)
 
-      if (msg.type === 'helmetViewToggled') {
-        setHelmetView(msg.active)
-      }
-
-    } catch (_) {}
-  }, [])
-
-  // ── Helmet connect / disconnect ───────────────────────────────────────────
-  const sendHelmetConnected = useCallback((helmetIp) => {
-    if (helmetIp) HelmetUDP.setTarget(helmetIp, 4210)
-    HelmetMapStreamer.start(injectJS)
-    injectMessage({ type: 'helmetConnected' })
-    enableHelmetView()
-    setHelmetConnected(true)
-  }, [injectMessage, injectJS, enableHelmetView])
+      injectMessage({ type: 'helmetConnected' })
+      enableHelmetView()
+      setHelmetConnected(true)
+    },
+    [injectMessage, injectJS, enableHelmetView]
+  )
 
   const sendHelmetDisconnected = useCallback(() => {
-    HelmetMapStreamer.stop()          // user explicitly stopped — truly stop
-    HelmetUDP.send({ type: 'clear' })
+    Tts.stop()
+    HelmetMapStreamer.stop()
     HelmetUDP.destroy()
+
     injectMessage({ type: 'helmetDisconnected' })
     disableHelmetView()
     setHelmetConnected(false)
   }, [injectMessage, disableHelmetView])
 
-  // ── App background / foreground ───────────────────────────────────────────
+  // ── App background / foreground ─────────────────────────────────────────────
   useEffect(() => {
     const sub = AppState.addEventListener('change', (nextState) => {
-      if (appStateRef.current === 'active' && nextState.match(/inactive|background/)) {
-        // App backgrounded — pause inject (WebView freezes anyway)
+      if (
+        appStateRef.current === 'active' &&
+        nextState.match(/inactive|background/)
+      ) {
         HelmetMapStreamer.pause()
+
         if (sessionActive.current) {
           locationSub.current?.remove()
           locationSub.current = null
         }
       }
-      if (appStateRef.current.match(/inactive|background/) && nextState === 'active') {
-        // App foregrounded — resume with current inject ref
+
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextState === 'active'
+      ) {
         if (HelmetMapStreamer.isActive()) {
           HelmetMapStreamer.resume(injectJS)
         }
+
         if (sessionActive.current && !locationSub.current) {
           startGPS()
         }
+
+        if (HelmetUDP.hasPeerIP()) {
+          HelmetUDP.sendDateTime(new Date())
+        }
       }
+
       appStateRef.current = nextState
     })
+
     return () => sub.remove()
   }, [startGPS, injectJS])
 
-  // ── Mount / unmount ───────────────────────────────────────────────────────
+  // ── Mount / unmount ─────────────────────────────────────────────────────────
   useEffect(() => {
     const existing = getNavState()
-    if (existing.active) sessionActive.current = true
+
+    if (existing.active) {
+      sessionActive.current = true
+      totalDistKmRef.current = existing.totalDistKm ?? existing.distKm
+    }
 
     return () => {
       locationSub.current?.remove()
       webViewReady.current = false
-      // ── KEY FIX ──────────────────────────────────────────────────────────
-      // Do NOT call HelmetMapStreamer.stop() here.
-      // The streamer keeps its timer alive. _inject calls become no-ops while
-      // the WebView is unmounted. When the user returns, onWebViewLoad calls
-      // HelmetMapStreamer.updateInject(injectJS) to reconnect the inject fn.
-      // The streamer only truly stops when the user taps 📡 (disconnect)
-      // or taps "Stop Navigation" in the back-button alert.
-      // ─────────────────────────────────────────────────────────────────────
+      Tts.stop()
     }
   }, [])
 
-  // ── Back handler ──────────────────────────────────────────────────────────
+  // ── Back handler ────────────────────────────────────────────────────────────
   const handleBack = () => {
     if (sessionActive.current) {
       Alert.alert(
@@ -257,17 +369,21 @@ export default function NavigationScreen({ navigation }) {
             text: 'Keep Running',
             style: 'cancel',
             onPress: () => navigation.goBack(),
-            // Streamer keeps running — ESP32 display keeps updating
           },
           {
             text: 'Stop Navigation',
             style: 'destructive',
             onPress: async () => {
-              HelmetMapStreamer.stop()   // user chose to stop everything
-              HelmetUDP.send({ type: 'clear' })
+              Tts.stop()
+              HelmetMapStreamer.stop()
+              HelmetUDP.destroy()
+
               await stopNavSession()
+
               sessionActive.current = false
+              totalDistKmRef.current = null
               setHelmetConnected(false)
+
               navigation.goBack()
             },
           },
@@ -280,12 +396,13 @@ export default function NavigationScreen({ navigation }) {
 
   const mapSource = Platform.select({
     android: { uri: 'file:///android_asset/navigation-map.html' },
-    ios:     { uri: 'navigation-map.html' },
+    ios: { uri: 'navigation-map.html' },
   })
 
   return (
     <View style={styles.container}>
       <StatusBar hidden />
+
       <WebView
         ref={webViewRef}
         source={mapSource}
@@ -316,49 +433,98 @@ export default function NavigationScreen({ navigation }) {
           if (helmetConnected) {
             sendHelmetDisconnected()
           } else {
-            sendHelmetConnected(ESP32_IP)
+            const ip = getESP32IP()
+
+            if (!ip) {
+              Alert.alert(
+                'Scanning...',
+                'ESP32 not found yet. Make sure helmet is on and on the same WiFi.'
+              )
+              return
+            }
+
+            sendHelmetConnected(ip)
           }
         }}
       >
-        <Text style={styles.backBtnText}>{helmetConnected ? '📡' : '📵'}</Text>
+        <Text style={styles.backBtnText}>
+          {helmetConnected ? '📡' : '📵'}
+        </Text>
       </TouchableOpacity>
     </View>
   )
 }
 
 const ACCENT = '#00dca0'
-const BG     = 'rgba(10, 12, 16, 0.88)'
+const BG = 'rgba(10, 12, 16, 0.88)'
 const BORDER = 'rgba(0, 220, 180, 0.18)'
 const ACTIVE = 'rgba(0, 220, 160, 0.25)'
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0a0c10' },
-  webview:   { flex: 1, backgroundColor: '#0a0c10' },
+  container: {
+    flex: 1,
+    backgroundColor: '#0a0c10',
+  },
+  webview: {
+    flex: 1,
+    backgroundColor: '#0a0c10',
+  },
   gpsBadge: {
-    position: 'absolute', top: 80, alignSelf: 'center',
-    backgroundColor: BG, borderWidth: 1, borderColor: BORDER,
-    borderRadius: 4, paddingHorizontal: 16, paddingVertical: 6,
+    position: 'absolute',
+    top: 80,
+    alignSelf: 'center',
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
   },
   gpsBadgeText: {
     color: ACCENT,
     fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
-    fontSize: 11, letterSpacing: 1.5, textTransform: 'uppercase',
+    fontSize: 11,
+    letterSpacing: 1.5,
+    textTransform: 'uppercase',
   },
   backBtn: {
-    position: 'absolute', top: 12, left: 12,
-    width: 36, height: 36, backgroundColor: BG,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 5,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    width: 36,
+    height: 36,
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backBtnText: { color: ACCENT, fontSize: 24, lineHeight: 28, marginTop: -2 },
+  backBtnText: {
+    color: ACCENT,
+    fontSize: 24,
+    lineHeight: 28,
+    marginTop: -2,
+  },
   debugBtn: {
-    position: 'absolute', top: 12, right: 12,
-    width: 36, height: 36, backgroundColor: BG,
-    borderWidth: 1, borderColor: BORDER, borderRadius: 5,
-    alignItems: 'center', justifyContent: 'center',
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 36,
+    height: 36,
+    backgroundColor: BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   debugBtnActive: {
     backgroundColor: ACTIVE,
     borderColor: ACCENT,
   },
 })
+
+
+
+// npm install react-native-tts

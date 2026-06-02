@@ -10,6 +10,10 @@ import DashboardPage    from './pages/DashboardPage'
 import EmergencyPage    from './pages/EmergencyPage'
 import NavigationScreen from './pages/NavigationScreen'
 import { requestNotificationPermission } from './utils/pushNotifications'
+import { startESP32Discovery } from './utils/ESP32Discovery'   // ← ADD THIS
+import ChangeProfilePage from './pages/ChangeProfilePage'
+import SettingsPage from './pages/SettingsPage'
+import { AppSettingsProvider } from './hooks/useAppSettings'
 
 const Stack = createNativeStackNavigator()
 
@@ -17,14 +21,20 @@ function RootNavigator() {
   const { isLoggedIn, isLoading } = useAuth()
   const emergencyActionRef = useRef(null)
 
-  // Ask for notification permission once after login — no Firebase, no token
+  // ── START ESP32 DISCOVERY ONCE ON APP LAUNCH ──────────────────────────────
+  useEffect(() => {
+    startESP32Discovery((ip) => {
+      console.log('[App] ESP32 discovered at:', ip)
+    })
+  }, [])
+  // ─────────────────────────────────────────────────────────────────────────
+
   useEffect(() => {
     if (isLoggedIn) {
       requestNotificationPermission()
     }
   }, [isLoggedIn])
 
-  // Listen for the local notification and trigger SMS
   useEffect(() => {
     const subscription = Notifications.addNotificationReceivedListener(notification => {
       const data = notification.request.content.data
@@ -61,8 +71,10 @@ function RootNavigator() {
             )}
           </Stack.Screen>
           <Stack.Screen name="Navigation" component={NavigationScreen} />
-        </>
-      ) : (
+          <Stack.Screen name="ChangeProfile" component={ChangeProfilePage} />
+          <Stack.Screen name="Settings" component={SettingsPage} />
+          </>
+          ) : (
         <>
           <Stack.Screen name="Login"  component={LoginPage} />
           <Stack.Screen name="Signup" component={SignupPage} />
@@ -75,9 +87,11 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <AppSettingsProvider>
+        <NavigationContainer>
+          <RootNavigator />
+        </NavigationContainer>
+      </AppSettingsProvider>
     </AuthProvider>
   )
 }

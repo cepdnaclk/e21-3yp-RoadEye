@@ -1,7 +1,6 @@
 // src/api/tiltApi.js
 
 const BASE_URL = "http://10.30.12.231:8080/api"
-
 // 🔹 Send tilt event
 export async function sendTiltEvent(data, token) {
   try {
