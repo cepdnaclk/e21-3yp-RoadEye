@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 // Android emulator  → 'http://10.0.2.2:8080'
 // iOS simulator     → 'http://localhost:8080'
 // Physical device   → 'http://192.168.137.186:8080'  (your PC's LAN IP)
-const BASE_URL = 'http://roadeye.eu-north-1.elasticbeanstalk.com/api'
+const BASE_URL = 'http://roadeye.eu-north-1.elasticbeanstalk.com'
 // ───────────────────────────────────────────────────────────────────────────
 
 export default function SignupPage() {

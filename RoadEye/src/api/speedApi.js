@@ -3,7 +3,7 @@
 import { getNavState } from '../utils/NavigationSession'
 import { wmoToWeatherIcon } from '../utils/PCLinkConstants'
 
-const BASE_URL = 'http://roadeye.eu-north-1.elasticbeanstalk.com/api'
+const BASE_URL = 'http://roadeye.eu-north-1.elasticbeanstalk.com'
 
 export async function sendSpeedEvent(data, token) {
   if (!token) {

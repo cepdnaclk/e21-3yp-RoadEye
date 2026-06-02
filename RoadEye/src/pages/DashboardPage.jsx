@@ -280,7 +280,10 @@ export default function DashboardPage() {
           ))}
         </View>
 
-        <SectionHeader title="Navigation" />
+        <SectionHeader title="Navigation" 
+                       darkMode={darkMode}
+                       textScale={textScale}
+        />
         <TouchableOpacity
           style={[styles.navBtn, navSession.active && styles.navBtnActive]}
           onPress={() => navigation.navigate('Navigation')}
@@ -337,7 +340,7 @@ export default function DashboardPage() {
   )
 }
 
-function NavLiveBanner({ session, onResume, onStop }) {
+function NavLiveBanner({ session, onResume, onStop, textScale = 1, }) {
   return (
     <View style={banner.wrap}>
       <PulseDot />
@@ -382,7 +385,11 @@ function PulseDot() {
   )
 }
 
-function SectionHeader({ title }) {
+function SectionHeader({
+  title,
+  textScale = 1,
+  darkMode = false,
+}) {
   return (
     <View style={styles.sectionHeader}>
       <Text
@@ -396,14 +403,18 @@ function SectionHeader({ title }) {
       </Text>
 
       <TouchableOpacity>
-        <Text style={[styles.viewMore, { fontSize: 12 * textScale }]}>
+        <Text
+          style={[
+            styles.viewMore,
+            { fontSize: 12 * textScale },
+          ]}
+        >
           View more ›
         </Text>
       </TouchableOpacity>
     </View>
   )
 }
-
 const styles = StyleSheet.create({
   screen:            { flex: 1, backgroundColor: C.bg },
   scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
@@ -435,7 +446,10 @@ const styles = StyleSheet.create({
   navBtnTitle:       { fontSize: 15, fontWeight: '800', color: '#fff' },
   navBtnSub:         { fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 },
   navBtnArrow:       { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
+  textWhite:         {color: '#fff',},
+  badgeDark:         {borderColor: '#374151',},
 })
+
 
 const banner = StyleSheet.create({
   wrap:       { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#1a0505', borderBottomWidth: 1.5, borderBottomColor: '#ff3b30', paddingHorizontal: 16, paddingVertical: 10 },

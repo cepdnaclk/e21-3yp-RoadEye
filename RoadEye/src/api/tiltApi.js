@@ -1,6 +1,6 @@
 // src/api/tiltApi.js
 
-const BASE_URL = "http://roadeye.eu-north-1.elasticbeanstalk.com/api"
+const BASE_URL = "http://roadeye.eu-north-1.elasticbeanstalk.com"
 // 🔹 Send tilt event
 export async function sendTiltEvent(data, token) {
   try {
