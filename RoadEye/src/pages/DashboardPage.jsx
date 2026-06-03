@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 
-import { sendSpeedEvent, getLatestSpeed } from '../api/speedApi'
+import { sendSpeedEvent, getLatestSpeed, getMaxSpeed } from '../api/speedApi'
 import { sendTiltEvent } from '../api/tiltApi'
 
 import DashboardHeader from '../components/dashboard/DashboardHeader'
@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [helmetData,       setHelmetData]       = useState(null)
   const [helmetConnected,  setHelmetConnected]  = useState(false)
   const [confirmedSpeed,   setConfirmedSpeed]   = useState(0)   // ← last speed saved to DB
+  const [maxSpeed, setMaxSpeed] = useState(0) // ← max speed from DB
 
   const handleHelmetData = useCallback((data) => {
     if (data) setHelmetData(data)

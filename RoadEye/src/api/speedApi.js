@@ -87,4 +87,34 @@ export async function getTodaySpeed(userId, token) {
     console.error('[speedApi] ❌ Fetch speed error:', err)
     return []
   }
+
+  try {
+    const res = await fetch(
+      `${BASE_URL}/speed/max/${userId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    if (!res.ok) {
+      throw new Error(
+        `[speedApi] Failed to fetch max speed: ${res.status}`
+      )
+    }
+
+    return await res.json()
+
+  } catch (err) {
+    console.error(
+      '[speedApi] ❌ Max speed fetch error:',
+      err
+    )
+
+    return {
+      maxSpeed: 0,
+    }
+  }
+  
 }

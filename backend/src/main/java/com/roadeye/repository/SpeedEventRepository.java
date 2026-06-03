@@ -21,4 +21,8 @@ public interface SpeedEventRepository extends JpaRepository<SpeedEvent, UUID> {
 
     // Most recent speed — for live display on dashboard
     Optional<SpeedEvent> findTopByUserIdOrderByEventTimeDesc(UUID userId);
+
+    Optional<SpeedEvent> findTopByUserIdOrderBySpeedDesc(UUID userId); 
 }
+
+    

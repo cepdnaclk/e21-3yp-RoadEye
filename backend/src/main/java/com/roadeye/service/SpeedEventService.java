@@ -68,4 +68,15 @@ public class SpeedEventService {
                 userId, start, end
         );
     }
+
+    /**
+    * Maximum speed ever recorded for user.
+    */
+    public Double getMaxSpeed(UUID userId) {
+
+        return speedRepo
+                .findTopByUserIdOrderBySpeedDesc(userId)
+                .map(SpeedEvent::getSpeed)
+                .orElse(0.0);
+    }
 }

@@ -75,6 +75,21 @@ public class SpeedEventController {
         return ResponseEntity.ok(speedService.getTodaySpeeds(userId));
     }
 
+    @GetMapping("/max/{userId}")
+    public ResponseEntity<?> getMaxSpeed(
+            @PathVariable UUID userId
+    ) {
+
+        Double maxSpeed = speedService.getMaxSpeed(userId);
+
+        return ResponseEntity.ok(
+                Map.of(
+                        "maxSpeed", maxSpeed,
+                        "unit", "km/h"
+                )
+        );
+    }
+
     @Data
     public static class SpeedRequest {
         private UUID   userId;
