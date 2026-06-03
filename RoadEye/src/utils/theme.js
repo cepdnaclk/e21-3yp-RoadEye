@@ -1,5 +1,5 @@
 export const colors = {
-  primary:      '#4F46E5',
+  primary: '#6846af', // RoadEye green,
   primaryLight: '#6366F1',
   accent:       '#7C3AED',
   bg:           '#F5F6FA',

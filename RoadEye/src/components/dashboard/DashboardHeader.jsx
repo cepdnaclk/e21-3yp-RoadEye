@@ -105,7 +105,7 @@ export default function DashboardHeader({
         </View>
       </View>
 
-      <HelmetConnectButton helmet={helmet} />
+      <HelmetConnectButton helmet={helmet} darkMode={darkMode} />
 
       <Modal
         visible={dropdown}

@@ -71,7 +71,7 @@ function wmoToWeatherIcon(code) {
 }
 
 // ── COMPONENT ──────────────────────────────────────────────────────────────────
-export default function WeatherCard() {
+export default function WeatherCard({ darkMode = false, textScale = 1 }) {
   const [origin,      setOrigin]      = useState(null)
   const [dest,        setDest]        = useState(null)
   const [loading,     setLoading]     = useState(true)
@@ -297,4 +297,16 @@ const styles = StyleSheet.create({
 
   destLoading:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 4 },
   destLoadingText: { fontSize: 11, color: C.muted },
+
+  cardDark: {
+    backgroundColor: '#1f2937',
+  },
+
+  textWhite: {
+    color: '#fff',
+  },
+
+  textMutedDark: {
+    color: '#d1d5db',
+  },
 })

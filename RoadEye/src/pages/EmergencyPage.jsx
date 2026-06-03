@@ -431,26 +431,26 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
         </TouchableOpacity>
 
         {detailsOpen && (
-          <View style={styles.dropdownContent}>
+          <View style={[styles.dropdownContent, darkMode && styles.cardDark]}>
 
             {/* Contacts */}
-            <TouchableOpacity style={styles.subHeader} onPress={() => setContactsOpen(!contactsOpen)} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.subHeader, darkMode && styles.cardDark]} onPress={() => setContactsOpen(!contactsOpen)} activeOpacity={0.8}>
               <View style={styles.subHeaderLeft}>
                 <Text style={styles.subHeaderIcon}>📞</Text>
-                <Text style={styles.subHeaderTitle}>Contacts</Text>
+                <Text style={[styles.subHeaderTitle, darkMode && styles.textWhite]}>Contacts</Text>
               </View>
               <Text style={styles.subHeaderArrow}>{contactsOpen ? '▲' : '▼'}</Text>
             </TouchableOpacity>
 
             {contactsOpen && (
               <View style={styles.subContent}>
-                <Text style={styles.cardDesc}>
+                <Text style={[styles.cardDesc, darkMode && styles.textMutedDark]}>
                   Add up to 5 emergency contacts. In an emergency, the system will automatically send them a message.
                 </Text>
 
                 <View style={styles.contactsRow}>
                   {emergencyContacts.length === 0 && (
-                    <Text style={styles.emptyText}>No contacts added yet.</Text>
+                    <Text style={[styles.emptyText, darkMode && styles.textMutedDark]}>No contacts added yet.</Text>
                   )}
 
                   {emergencyContacts.map((c, i) => (
@@ -463,7 +463,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                       <View style={[styles.contactAvatar, { backgroundColor: avatarColors[i % avatarColors.length] }]}>
                         <Text style={styles.contactAvatarText}>{c.name[0].toUpperCase()}</Text>
                       </View>
-                      <Text style={styles.contactName} numberOfLines={1}>{c.name}</Text>
+                      <Text style={[styles.contactName, darkMode && styles.textMutedDark]} numberOfLines={1}>{c.name}</Text>
                       {c.phone
                         ? <Text style={styles.phoneIndicator}>📱</Text>
                         : <Text style={styles.noPhoneIndicator}>⚠️</Text>
@@ -479,21 +479,21 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                           : <Text style={styles.addContactIcon}>+</Text>
                         }
                       </View>
-                      <Text style={styles.contactName}>Add</Text>
+                      <Text style={[styles.contactName, darkMode && styles.textMutedDark]}>Add</Text>
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={styles.hintText}>Tap to view • Long press to remove</Text>
+                <Text style={[styles.hintText, darkMode && styles.textMutedDark]}>Tap to view • Long press to remove</Text>
               </View>
             )}
 
-            <View style={styles.sectionDivider} />
+            <View style={[styles.sectionDivider, darkMode && styles.dividerDark]} />
 
             {/* Emergency Message */}
-            <TouchableOpacity style={styles.subHeader} onPress={() => setMessagesOpen(!messagesOpen)} activeOpacity={0.8}>
+            <TouchableOpacity style={[styles.subHeader, darkMode && styles.cardDark]} onPress={() => setMessagesOpen(!messagesOpen)} activeOpacity={0.8}>
               <View style={styles.subHeaderLeft}>
                 <Text style={styles.subHeaderIcon}>💬</Text>
-                <Text style={styles.subHeaderTitle}>Emergency Message</Text>
+                <Text style={[styles.subHeaderTitle, darkMode && styles.textWhite]}>Emergency Message</Text>
               </View>
               <Text style={styles.subHeaderArrow}>{messagesOpen ? '▲' : '▼'}</Text>
             </TouchableOpacity>
@@ -511,7 +511,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                 </View>
 
                 {sendDefault && (
-                  <View style={styles.messagePreviewBox}>
+                  <View style={[styles.messagePreviewBox,darkMode && styles.messagePreviewBoxDark,]}>
                     <View style={styles.msgLabelRow}>
                       <Text style={styles.msgLabelDot}>●</Text>
                       <Text style={styles.messagePreviewLabel}>
@@ -520,7 +520,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                     </View>
                     {!isEditingMessage ? (
                       <>
-                        <Text style={styles.messagePreviewText}>{activeMessage}</Text>
+                        <Text style={[styles.messagePreviewText, darkMode && styles.textWhite]}>{activeMessage}</Text>
                         <TouchableOpacity
                           style={styles.editMsgBtn}
                           onPress={() => { setCustomMessage(savedMessage || defaultMessage); setMessageError(''); setIsEditingMessage(true) }}
@@ -531,7 +531,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                     ) : (
                       <View style={styles.editMsgArea}>
                         <TextInput
-                          style={[styles.msgInput, messageError ? styles.msgInputError : null]}
+                          style={[styles.msgInput,darkMode && styles.msgInputDark, messageError ? styles.msgInputError : null]}
                           value={customMessage}
                           onChangeText={(text) => { setCustomMessage(text); if (messageError) setMessageError('') }}
                           multiline
@@ -559,7 +559,7 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
                 <View style={styles.divider} />
 
                 <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Send Emergency Alerts</Text>
+                  <Text style={[styles.switchLabel, darkMode && styles.textWhite]}>Send Emergency Alerts</Text>
                   <Switch
                     value={sendAlerts}
                     onValueChange={setSendAlerts}
@@ -865,4 +865,25 @@ const styles = StyleSheet.create({
   cardDark: {
     backgroundColor: '#1f2937',
   },
+  dividerDark: {
+  backgroundColor: '#374151',
+ },
+  messagePreviewBox: {
+    backgroundColor: '#FFF7ED',
+  },
+  msgInput: {
+  backgroundColor: '#fff',
+ },
+ messagePreviewBoxDark: {
+  backgroundColor: '#2a2f3c',
+ },
+
+  msgInputDark: {
+    backgroundColor: '#374151',
+    color: '#fff',
+    borderColor: '#4b5563',
+  },
+  addContactIcon: {
+  color: C.primary,
+ },
 })

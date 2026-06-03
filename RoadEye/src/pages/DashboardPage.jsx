@@ -139,18 +139,18 @@ export default function DashboardPage() {
   // ── Highlights — now uses real speed ─────────────────────────────────────
   const highlights = [
     {
-      label:  'Duration',
-      value:  '11,857',
-      sub:    'updated 15 min ago',
-      colors: ['#5B47E0', '#7B5CF5'],
-      icon:   '⏱',
+      label: 'Duration',
+      value: '11,857',
+      sub: 'updated 15 min ago',
+      colors: ['#6846af', '#6846af'],
+      icon: '⏱',
     },
     {
-      label:  'Current Speed',
-      value:  `${liveSpeed} km/h`,
-      sub:    speedSub,
-      colors: ['#7B5CF5', '#A78BFA'],
-      icon:   '🚴',
+      label: 'Current Speed',
+      value: `${liveSpeed} km/h`,
+      sub: speedSub,
+      colors: ['#6846af', '#6846af'],
+      icon: '🚴',
     },
   ]
 
@@ -175,7 +175,7 @@ export default function DashboardPage() {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <WeatherCard />
+        <WeatherCard darkMode={darkMode} textScale={textScale} />
         <MusicPlayer />
 
         <SectionHeader
@@ -196,7 +196,7 @@ export default function DashboardPage() {
             <Path
               d="M 20 100 A 50 50 0 0 1 160 100"
               fill="none"
-              stroke="#4F46E5"
+              stroke="#9d7bd7"
               strokeWidth={10}
               strokeLinecap="round"
               strokeDasharray={240}
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
   statVal:           { fontSize: 22, fontWeight: '800', color: C.text },
   statValLive:       { color: '#16a34a' },
   liveDot:           { width: 7, height: 7, borderRadius: 4, backgroundColor: '#4ade80' },
-  navBtn:            { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#1a1a2e', borderRadius: 16, padding: 16, marginBottom: 16 },
+  navBtn:            { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#2a1a2e', borderRadius: 16, padding: 16, marginBottom: 16 },
   navBtnActive:      { backgroundColor: '#2a0a0a', borderWidth: 1.5, borderColor: '#ff3b30' },
   navBtnIcon:        { fontSize: 28 },
   navBtnTitle:       { fontSize: 15, fontWeight: '800', color: '#fff' },

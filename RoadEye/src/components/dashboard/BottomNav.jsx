@@ -46,7 +46,7 @@ export default function BottomNav({
           style={styles.tab}
           activeOpacity={0.8}
         >
-          <Text style={[styles.icon, { fontSize: 22 * textScale }]}>
+          <Text style={[styles.icon, { fontSize: 22 * textScale },darkMode && styles.iconDark,active === tab.id && styles.iconActive,]}>
             {tab.icon}
           </Text>
 
@@ -102,6 +102,13 @@ const styles = StyleSheet.create({
   },
 
   labelActive: {
+    color: C.primary,
+  },
+    iconDark: {
+    color: '#d1d5db',
+  },
+
+  iconActive: {
     color: C.primary,
   },
 })

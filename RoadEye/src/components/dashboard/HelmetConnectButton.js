@@ -50,7 +50,7 @@ function LogModal({ visible, log, onClose }) {
 //  HelmetConnectButton
 // ═════════════════════════════════════════════════════════════════════════════
 
-export default function HelmetConnectButton({ helmet }) {
+export default function HelmetConnectButton({ helmet, darkMode = false }) {
   const [showLog,    setShowLog]    = useState(false)
   const [editingIp,  setEditingIp]  = useState(false)
   const [ipDraft,    setIpDraft]    = useState('')
@@ -106,10 +106,10 @@ export default function HelmetConnectButton({ helmet }) {
 
   // ── Button config per state ───────────────────────────────────────────────
   const cfg = {
-    [HELMET_STATE.DISCONNECTED]: { dot: 'rgba(255,255,255,0.4)', label: 'Connect to the helmet',  bg: '#4B3FE4' },
-    [HELMET_STATE.SCANNING]:     { dot: '#fff',                  label: 'Scanning for helmet...', bg: '#3a30c2' },
-    [HELMET_STATE.CONNECTING]:   { dot: '#fff',                  label: 'Connecting...',           bg: '#3a30c2' },
-    [HELMET_STATE.CONNECTED]:    { dot: '#2ecc71',               label: 'Connected to the helmet', bg: '#4B3FE4' },
+    [HELMET_STATE.DISCONNECTED]: { dot: 'rgba(255,255,255,0.4)', label: 'Connect to the helmet',  bg: '#c478e9'},
+    [HELMET_STATE.SCANNING]:     { dot: '#fff',                  label: 'Scanning for helmet...', bg: '#5b3a99' },
+    [HELMET_STATE.CONNECTING]:   { dot: '#fff',                  label: 'Connecting...',           bg: '#c478e9'},
+    [HELMET_STATE.CONNECTED]:    { dot: '#2ecc71',               label: 'Connected to the helmet', bg: '#6846af' },
     [HELMET_STATE.ERROR]:        { dot: '#e74c3c',               label: 'Retry connection',        bg: '#c0392b' },
   }[connectionState]
 
@@ -119,11 +119,11 @@ export default function HelmetConnectButton({ helmet }) {
 
       {/* IP row */}
       <View style={s.ipRow}>
-        <Text style={s.ipLabel}>Helmet IP</Text>
+        <Text style={[s.ipLabel, darkMode && s.textWhite]}>Helmet IP</Text>
 
         {editingIp ? (
           <TextInput
-            style={s.ipInput}
+            style={[s.ipInput, darkMode && s.ipInputDark]}
             value={ipDraft}
             onChangeText={setIpDraft}
             keyboardType="decimal-pad"
@@ -139,14 +139,14 @@ export default function HelmetConnectButton({ helmet }) {
           >
             {helmetIp ? (
               <>
-                <Text style={s.ipText}>{helmetIp}</Text>
+                <Text style={[s.ipText, darkMode && s.textWhite]}>{helmetIp}</Text>
                 {/* Show green "Auto" badge when IP was discovered automatically */}
                 {discovered && !isConnected && (
                   <View style={s.autoBadge}>
                     <Text style={s.autoBadgeText}>Auto</Text>
                   </View>
                 )}
-                <Text style={s.ipEdit}>Edit</Text>
+                <Text style={[s.ipEdit, darkMode && s.textWhite]}>Edit</Text>
               </>
             ) : (
               // No IP yet — show scanning hint
@@ -219,7 +219,10 @@ const s = StyleSheet.create({
   ipText:          { fontSize: 13, fontWeight: '600', color: '#1a1a2e', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' },
   ipEdit:          { fontSize: 12, color: '#4B3FE4', fontWeight: '600' },
   ipInput:         { flex: 1, borderWidth: 1.5, borderColor: '#4B3FE4', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5, fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#1a1a2e' },
-
+  ipInputDark: {
+    color: '#fff',
+    borderColor: '#fff',
+  },
   // Auto badge — shown when IP was discovered automatically
   autoBadge:       { backgroundColor: '#dcfce7', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2 },
   autoBadgeText:   { fontSize: 10, color: '#16a34a', fontWeight: '700' },
@@ -257,4 +260,7 @@ const s = StyleSheet.create({
   modalTitle:      { color: '#fff', fontSize: 15, fontWeight: '700' },
   modalClose:      { color: '#4B3FE4', fontWeight: '600' },
   logLine:         { fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, lineHeight: 20 },
+  textWhite: {
+     color: '#fff',
+  },
 })
