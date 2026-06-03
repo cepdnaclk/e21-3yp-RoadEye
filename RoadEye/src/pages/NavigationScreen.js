@@ -32,9 +32,11 @@ import HelmetMapStreamer from '../utils/HelmetMapStreamer'
 import { sendSpeedEvent } from '../api/speedApi'
 import { useAuth } from '../hooks/useAuth'
 import { getESP32IP } from '../utils/ESP32Discovery'
+import { useAppSettings } from '../hooks/useAppSettings'
 
 export default function NavigationScreen({ navigation }) {
   const { userId, token } = useAuth()
+  const { darkMode, textScale, voiceGuidance } = useAppSettings()
 
   const webViewRef    = useRef(null)
   const locationSub   = useRef(null)

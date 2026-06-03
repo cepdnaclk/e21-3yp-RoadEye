@@ -8,6 +8,8 @@ import * as Contacts from 'expo-contacts'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../utils/theme'
+import BottomNav from '../components/dashboard/BottomNav'
+import { useAppSettings } from '../hooks/useAppSettings'
 
 const C = colors
 
@@ -68,6 +70,8 @@ const avatarColors = ['#4F46E5', '#7C3AED', '#2563EB', '#059669', '#DC2626']
 // ─── CHANGE 1: Added onRegisterAction prop ────────────────────────────────
 export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', onRegisterAction }) {
   const insets = useSafeAreaInsets()
+  const { darkMode, textScale } = useAppSettings()
+  const [activeTab, setActiveTab] = useState('emergency')
   const isLoadingContactsRef = useRef(false)
 
   // ── Core state ────────────────────────────────────────────────────────────
@@ -389,10 +393,10 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { paddingTop: insets.top },darkMode && styles.screenDark,]}>
 
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Emergency</Text>
+      <View style={[styles.header, darkMode && styles.headerDark]}>
+        <Text style={[styles.headerTitle,{ fontSize: 24 * textScale },darkMode && styles.textWhite,]}>Emergency</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity style={styles.iconBtn}>
             <Text style={styles.iconText}>⚙️</Text>
@@ -720,7 +724,12 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
           />
         </View>
       </Modal>
-
+      <BottomNav
+        active={activeTab}
+        onChange={setActiveTab}
+        darkMode={darkMode}
+        textScale={textScale}
+      />
     </View>
   )
 }
@@ -836,4 +845,24 @@ const styles = StyleSheet.create({
   listDivider:          { height: 1, backgroundColor: '#F3F4F6' },
   loadingWrap:          { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 40 },
   loadingText:          { fontSize: 15, color: '#6B7280' },
+  screenDark: {
+  backgroundColor: '#111827',
+  },
+
+  headerDark: {
+    backgroundColor: '#1f2937',
+    borderBottomColor: '#374151',
+  },
+
+  textWhite: {
+    color: '#fff',
+  },
+
+  textMutedDark: {
+    color: '#d1d5db',
+  },
+
+  cardDark: {
+    backgroundColor: '#1f2937',
+  },
 })

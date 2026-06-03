@@ -22,11 +22,17 @@ export default function SettingsPage() {
   const { user } = useAuth()
   const [open, setOpen] = useState(null)
 
-  const [darkMode, setDarkMode] = useState(false)
-  const [textScale, setTextScale] = useState(1)
-  const [voiceOpen, setVoiceOpen] = useState(false)
-  const [voiceMode, setVoiceMode] = useState('Full navigation voice')
+  const {
+    darkMode,
+    textScale,
+    voiceGuidance,
+    setDarkMode,
+    setTextScale,
+    setVoiceGuidance,
+    resetTextScale,
+  } = useAppSettings()
 
+  const [voiceOpen, setVoiceOpen] = useState(false)
   const username = user?.username || 'User'
   const initial = (username?.[0] || 'U').toUpperCase()
 
@@ -100,7 +106,7 @@ export default function SettingsPage() {
                 onPress={() => setVoiceOpen(!voiceOpen)}
               >
                 <Text style={[styles.itemText, darkMode && styles.textWhite]}>Voice guidance</Text>
-                <Text style={styles.voiceValue}>{voiceMode}  {voiceOpen ? '⌃' : '⌄'}</Text>
+                <Text style={styles.voiceValue}>{voiceGuidance}  {voiceOpen ? '⌃' : '⌄'}</Text>
               </TouchableOpacity>
 
               {voiceOpen && (
@@ -110,12 +116,12 @@ export default function SettingsPage() {
                       key={option}
                       style={styles.voiceOption}
                       onPress={() => {
-                        setVoiceMode(option)
+                        setVoiceGuidance(option)
                         setVoiceOpen(false)
                       }}
                     >
                       <Text style={[styles.voiceOptionText, darkMode && styles.textWhite]}>
-                        {option === voiceMode ? '✓ ' : ''}{option}
+                        {option === voiceGuidance ? '✓ ' : ''}{option}
                       </Text>
                     </TouchableOpacity>
                   ))}

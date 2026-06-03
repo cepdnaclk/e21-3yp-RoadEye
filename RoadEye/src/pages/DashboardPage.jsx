@@ -155,7 +155,7 @@ export default function DashboardPage() {
   ]
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { paddingTop: insets.top },darkMode && styles.screenDark]}>
       <DashboardHeader
         onLogout={logout}
         onHelmetData={handleHelmetData}
@@ -330,12 +330,12 @@ export default function DashboardPage() {
           textScale={textScale}
         />
 
-        <StatsChart />
+        <StatsChart darkMode={darkMode} textScale={textScale} />
 
         <View style={{ height: 20 }} />
       </ScrollView>
 
-      <BottomNav active={activeTab} onChange={setActiveTab} />
+      <BottomNav active={activeTab} onChange={setActiveTab} darkMode={darkMode} textScale={textScale} />
     </View>
   )
 }
@@ -448,6 +448,7 @@ const styles = StyleSheet.create({
   navBtnArrow:       { fontSize: 22, color: '#5B47E0', fontWeight: '700' },
   textWhite:         {color: '#fff',},
   badgeDark:         {borderColor: '#374151',},
+  screenDark:        {backgroundColor: '#111827',},
 })
 
 
