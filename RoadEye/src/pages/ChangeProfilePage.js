@@ -1,13 +1,21 @@
 import React, { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity,
-  Image, StyleSheet, Alert
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  Alert,
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { apiMultipart } from '../utils/apiClient'
+import { api } from '../utils/apiClient'
+import { useAppSettings } from '../hooks/useAppSettings'
 
 export default function ChangeProfilePage({ navigation }) {
+  const { darkMode, textScale } = useAppSettings()
+
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -51,29 +59,35 @@ export default function ChangeProfilePage({ navigation }) {
   }
 
   const saveProfile = async () => {
-    if (password && password !== rePassword) {
-      Alert.alert('Error', 'Passwords do not match')
+    if (password || rePassword) {
+      Alert.alert(
+        'Not supported yet',
+        'Your current backend only supports first name, last name, and phone number update.'
+      )
+      return
+    }
+
+    if (image) {
+      Alert.alert(
+        'Not supported yet',
+        'Profile image update needs a new backend multipart endpoint.'
+      )
       return
     }
 
     try {
       const userId = await AsyncStorage.getItem('userId')
 
-      const formData = new FormData()
-      formData.append('username', username)
-      formData.append('email', email)
-
-      if (password) formData.append('password', password)
-
-      if (image) {
-        formData.append('profileImage', {
-          uri: image,
-          name: 'profile.jpg',
-          type: 'image/jpeg',
-        })
+      if (!userId) {
+        Alert.alert('Error', 'User ID not found. Please login again.')
+        return
       }
 
-      await apiMultipart(`/api/users/${userId}/profile`, formData, 'PUT')
+      await api.put(`/users/${userId}`, {
+        firstName: username.trim(),
+        lastName: '',
+        phoneNumber: '',
+      })
 
       Alert.alert('Success', 'Profile updated successfully')
       navigation.goBack()
@@ -84,7 +98,7 @@ export default function ChangeProfilePage({ navigation }) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, darkMode && styles.containerDark]}>
       <TouchableOpacity style={styles.imageBox} onPress={pickImage}>
         {image ? (
           <Image source={{ uri: image }} style={styles.profileImage} />
@@ -93,52 +107,131 @@ export default function ChangeProfilePage({ navigation }) {
         )}
       </TouchableOpacity>
 
-      <Text style={styles.label}>Change User name</Text>
-      <TextInput style={styles.input} placeholder="Enter username" value={username} onChangeText={setUsername} />
+      <Text style={[styles.label, { fontSize: 16 * textScale }, darkMode && styles.textWhite]}>
+        Change User name
+      </Text>
+      <TextInput
+        style={[styles.input, darkMode && styles.inputDark]}
+        placeholder="Enter username"
+        placeholderTextColor={darkMode ? '#d1d5db' : '#9ca3af'}
+        value={username}
+        onChangeText={setUsername}
+      />
 
-      <Text style={styles.label}>Change Email</Text>
-      <TextInput style={styles.input} placeholder="Enter email" value={email} onChangeText={setEmail} keyboardType="email-address" />
+      <Text style={[styles.label, { fontSize: 16 * textScale }, darkMode && styles.textWhite]}>
+        Change Email
+      </Text>
+      <TextInput
+        style={[styles.input, darkMode && styles.inputDark]}
+        placeholder="Enter email"
+        placeholderTextColor={darkMode ? '#d1d5db' : '#9ca3af'}
+        value={email}
+        onChangeText={setEmail}
+        keyboardType="email-address"
+      />
 
-      <Text style={styles.label}>Change Password</Text>
-      <TextInput style={styles.input} placeholder="Enter password" value={password} onChangeText={setPassword} secureTextEntry />
+      <Text style={[styles.label, { fontSize: 16 * textScale }, darkMode && styles.textWhite]}>
+        Change Password
+      </Text>
+      <TextInput
+        style={[styles.input, darkMode && styles.inputDark]}
+        placeholder="Enter password"
+        placeholderTextColor={darkMode ? '#d1d5db' : '#9ca3af'}
+        value={password}
+        onChangeText={setPassword}
+        secureTextEntry
+      />
 
-      <Text style={styles.label}>Re enter password</Text>
-      <TextInput style={styles.input} placeholder="Enter password" value={rePassword} onChangeText={setRePassword} secureTextEntry />
+      <Text style={[styles.label, { fontSize: 16 * textScale }, darkMode && styles.textWhite]}>
+        Re enter password
+      </Text>
+      <TextInput
+        style={[styles.input, darkMode && styles.inputDark]}
+        placeholder="Enter password"
+        placeholderTextColor={darkMode ? '#d1d5db' : '#9ca3af'}
+        value={rePassword}
+        onChangeText={setRePassword}
+        secureTextEntry
+      />
 
       <TouchableOpacity style={styles.saveBtn} onPress={saveProfile}>
-        <Text style={styles.saveText}>Save</Text>
+        <Text style={[styles.saveText, { fontSize: 16 * textScale }]}>
+          Save
+        </Text>
       </TouchableOpacity>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', paddingHorizontal: 24, paddingTop: 70 },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingTop: 70,
+  },
+
+  containerDark: {
+    backgroundColor: '#111827',
+  },
+
   imageBox: {
-    width: 90, height: 90, borderRadius: 45,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: '#e5e7eb',
     alignSelf: 'center',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 35,
   },
-  profileImage: { width: 90, height: 90, borderRadius: 45 },
-  cameraIcon: { fontSize: 24 },
-  label: { fontSize: 16, color: '#374151', marginBottom: 6 },
+
+  profileImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+
+  cameraIcon: {
+    fontSize: 24,
+  },
+
+  label: {
+    color: '#374151',
+    marginBottom: 6,
+  },
+
+  textWhite: {
+    color: '#fff',
+  },
+
   input: {
     backgroundColor: '#f1f2f6',
     borderRadius: 22,
     paddingHorizontal: 14,
     height: 68,
     marginBottom: 14,
+    color: '#111827',
   },
+
+  inputDark: {
+    backgroundColor: '#1f2937',
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: '#374151',
+  },
+
   saveBtn: {
-    backgroundColor: '#5856F3',
+    backgroundColor: '#6846af',
     height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 35,
   },
-  saveText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+
+  saveText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
 })
