@@ -61,6 +61,25 @@ export default function DashboardPage() {
     fetchLastSpeed()
   }, [])
 
+  // ── get max speed ─────────────────────
+  useEffect(() => {
+
+    const fetchMaxSpeed = async () => {
+
+      const result = await getMaxSpeed(
+        userId,
+        token
+      )
+
+      if (result?.maxSpeed !== undefined) {
+        setMaxSpeed(result.maxSpeed)
+      }
+    }
+
+    fetchMaxSpeed()
+
+  }, [])
+
   // ── Send speed every 5s when helmet is connected ──────────────────────────
   useEffect(() => {
     if (!helmetData || !helmetConnected || !userId || !token) return
@@ -83,6 +102,9 @@ export default function DashboardPage() {
       // Update confirmed speed from what backend actually saved
       if (result?.speed !== undefined) {
         setConfirmedSpeed(result.speed)
+        if (result.speed > maxSpeed) {
+          setMaxSpeed(result.speed)
+        }
       }
     }
     send()
@@ -141,10 +163,10 @@ export default function DashboardPage() {
   const highlights = [
     {
       label: 'Max Speed',
-      value: '11,857',
-      sub: 'updated 15 min ago',
+      value: `${Number(maxSpeed).toFixed(0)} km/h`,
+      sub: 'highest recorded',
       colors: ['#6846af', '#6846af'],
-      icon: '⏱',
+      icon: '🏁',
     },
     {
       label: 'Current Speed',
