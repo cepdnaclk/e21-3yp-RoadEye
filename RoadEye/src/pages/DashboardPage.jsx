@@ -140,7 +140,7 @@ export default function DashboardPage() {
   // ── Highlights — now uses real speed ─────────────────────────────────────
   const highlights = [
     {
-      label: 'Duration',
+      label: 'Max Speed',
       value: '11,857',
       sub: 'updated 15 min ago',
       colors: ['#6846af', '#6846af'],
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   highlightLabel:    { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.9)' },
   highlightIcon:     { fontSize: 20 },
   highlightVal:      { fontSize: 22, fontWeight: '800', color: '#fff', marginVertical: 6 },
-  highlightSub:      { fontSize: 10, color: 'rgba(255,255,255,0.8)' },
+  highlightSub:      { fontSize: 15, color: 'rgba(255,255,255,0.8)' },
   statCard:          { flex: 1, minWidth: '45%', backgroundColor: C.white, borderRadius: 14, padding: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 1 },
   statCardLive:      { borderWidth: 1.5, borderColor: '#4ade80' },
   statCardTop:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
