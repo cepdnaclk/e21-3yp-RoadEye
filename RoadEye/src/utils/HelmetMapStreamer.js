@@ -36,6 +36,7 @@ const HelmetMapStreamer = {
     _waiting = false
 
     console.log('[MapStreamer] started')
+    _requestFrame()  
     _scheduleNext()
   },
 
@@ -125,7 +126,7 @@ function _requestFrame() {
 
   setTimeout(() => {
     _waiting = false
-  }, 1500)
+  }, 700)
 
   _inject(`
     (function() {
@@ -275,7 +276,9 @@ async function _processFrame(base64) {
     jpegBytes[i] = binary.charCodeAt(i)
   }
 
-  if (_prevB64 !== null) {
+  const isFirstFrame = _prevB64 === null
+
+  if (!isFirstFrame) {
     const changed = _b64ChangedRatio(base64, _prevB64)
 
     console.log(`[MapStreamer] frame diff ratio: ${(changed * 100).toFixed(1)}%`)

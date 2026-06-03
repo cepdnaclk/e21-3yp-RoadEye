@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   card:                 { borderRadius: 16, padding: 16, marginBottom: 10, elevation: 6 },
   header:               { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
   title:                { fontSize: 16, fontWeight: '800', color: '#fff' },
-  helmetBadge:          { backgroundColor: '#4F46E5', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
+  helmetBadge:          { backgroundColor: '#4c0769', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 },
   helmetText:           { fontSize: 10, fontWeight: '700', color: '#fff' },
   tabBar:               { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: 3, marginBottom: 16 },
   tab:                  { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 8 },

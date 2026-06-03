@@ -164,9 +164,9 @@ export default function WeatherCard({ darkMode = false, textScale = 1 }) {
   // ── Loading state ───────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <View style={[styles.card, styles.loadingCard]}>
+      <View style={[styles.card,darkMode && styles.cardDark, styles.loadingCard]}>
         <ActivityIndicator color={C.primary || '#5B47E0'} />
-        <Text style={styles.loadingText}>Fetching weather…</Text>
+        <Text style={[styles.loadingText, darkMode && styles.textWhite,]}>Fetching weather…</Text>
       </View>
     )
   }
@@ -176,56 +176,56 @@ export default function WeatherCard({ darkMode = false, textScale = 1 }) {
   // ── No destination: full-width single card ──────────────────────────────────
   if (!hasDest) {
     return (
-      <View style={styles.card}>
-        <FullWeatherBlock data={origin} />
+      <View style={[styles.card, darkMode && styles.cardDark]}>
+        <FullWeatherBlock data={origin} darkMode={darkMode} textScale={textScale}/>
       </View>
     )
   }
 
   // ── Destination active: split two-column card ───────────────────────────────
   return (
-    <View style={styles.card}>
-      <SplitWeatherBlock data={origin} label="MY LOCATION" accent="#5B47E0" />
-      <View style={styles.divider} />
+    <View style={[styles.card, darkMode && styles.cardDark]}>
+      <SplitWeatherBlock data={origin} label="MY LOCATION" accent="#5B47E0" darkMode={darkMode} textScale={textScale} />
+      <View style={[styles.divider,darkMode && styles.dividerDark,]} />
       {destLoading ? (
         <View style={styles.destLoading}>
           <ActivityIndicator size="small" color="#E05B47" />
-          <Text style={styles.destLoadingText}>Destination…</Text>
+          <Text style={[styles.destLoadingText, darkMode && styles.textWhite,]}>Destination…</Text>
         </View>
       ) : (
-        <SplitWeatherBlock data={dest} label="DESTINATION" accent="#E05B47" />
+        <SplitWeatherBlock data={dest} label="DESTINATION" accent="#E05B47" darkMode={darkMode} textScale={textScale} />
       )}
     </View>
   )
 }
 
 // ── Full-width block ───────────────────────────────────────────────────────────
-function FullWeatherBlock({ data }) {
+function FullWeatherBlock({ data ,darkMode = false,textScale = 1,}) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
   return (
     <View style={styles.fullBlock}>
       <View style={styles.fullLeft}>
-        <Text style={styles.fullTemp}>
-          {data.temp}°<Text style={styles.fullUnit}>C</Text>
+        <Text style={[styles.fullTemp, darkMode && styles.textWhite,]}>
+          {data.temp}°<Text style={[styles.fullUnit, darkMode && styles.textMutedDark,]}>C</Text>
         </Text>
-        <Text style={styles.fullCondition}>{condition}</Text>
-        <Text style={styles.fullRange}>H: {data.high}°  L: {data.low}°</Text>
+        <Text style={[styles.fullCondition,darkMode && styles.textWhite,]}>{condition}</Text>
+        <Text style={[styles.fullRange,darkMode && styles.textMutedDark,]}>H: {data.high}°  L: {data.low}°</Text>
       </View>
       <View style={styles.fullMeta}>
         <View style={styles.fullMetaRow}>
           <Text>💧</Text>
-          <Text style={styles.fullMetaLabel}>Humidity</Text>
-          <Text style={styles.fullMetaVal}>{data.humidity}%</Text>
+          <Text style={[styles.fullMetaLabel,darkMode && styles.textWhite,]}>Humidity</Text>
+          <Text style={[styles.fullMetaVal,darkMode && styles.textWhite,]}>{data.humidity}%</Text>
         </View>
         <View style={styles.fullMetaRow}>
           <Text>🌬️</Text>
-          <Text style={styles.fullMetaLabel}>Wind</Text>
-          <Text style={styles.fullMetaVal}>{data.wind} km/h</Text>
+          <Text style={[styles.fullMetaLabel,darkMode && styles.textWhite,]}>Wind</Text>
+          <Text style={[styles.fullMetaVal,darkMode && styles.textWhite,]}>{data.wind} km/h</Text>
         </View>
-        <Text style={styles.fullLocation} numberOfLines={1}>{data.name}</Text>
+        <Text style={[styles.fullLocation,darkMode && styles.textMutedDark,]} numberOfLines={1}>{data.name}</Text>
       </View>
-      <View style={styles.fullIconBox}>
+      <View style={[styles.fullIconBox, darkMode && styles.fullIconBoxDark,]}>
         <Text style={styles.fullIcon}>{icon}</Text>
       </View>
     </View>
@@ -233,23 +233,23 @@ function FullWeatherBlock({ data }) {
 }
 
 // ── Compact split block ────────────────────────────────────────────────────────
-function SplitWeatherBlock({ data, label, accent }) {
+function SplitWeatherBlock({ data, label, accent,darkMode = false, textScale = 1,}) {
   if (!data) return null
   const { icon, label: condition } = wmoIcon(data.code || 0)
   return (
     <View style={styles.splitBlock}>
       <Text style={[styles.splitLabel, { color: accent }]}>{label}</Text>
-      <Text style={styles.splitLocation} numberOfLines={1}>{data.name}</Text>
+      <Text style={[styles.splitLocation,darkMode && styles.textMutedDark,]} numberOfLines={1}>{data.name}</Text>
       <View style={styles.splitTempRow}>
         <Text style={styles.splitIcon}>{icon}</Text>
-        <Text style={styles.splitTemp}>{data.temp}°</Text>
-        <Text style={styles.splitUnit}>C</Text>
+        <Text style={[styles.splitTemp,darkMode && styles.textWhite,]}>{data.temp}°</Text>
+        <Text style={[styles.splitUnit,darkMode && styles.textMutedDark,]}>C</Text>
       </View>
-      <Text style={styles.splitCondition}>{condition}</Text>
-      <Text style={styles.splitRange}>H: {data.high}°  L: {data.low}°</Text>
+      <Text style={[styles.splitCondition,darkMode && styles.textWhite,]}>{condition}</Text>
+      <Text style={[styles.splitRange,darkMode && styles.textMutedDark,]}>H: {data.high}°  L: {data.low}°</Text>
       <View style={styles.splitMeta}>
-        <Text style={styles.splitMetaItem}>💧 {data.humidity}%</Text>
-        <Text style={styles.splitMetaItem}>🌬️ {data.wind} km/h</Text>
+        <Text style={[styles.splitMetaItem,darkMode && styles.textWhite,]}>💧 {data.humidity}%</Text>
+        <Text style={[styles.splitMetaItem,darkMode && styles.textWhite,]}>🌬️ {data.wind} km/h</Text>
       </View>
     </View>
   )
@@ -309,4 +309,10 @@ const styles = StyleSheet.create({
   textMutedDark: {
     color: '#d1d5db',
   },
+  fullIconBoxDark: {
+  backgroundColor: '#374151',
+  },
+  dividerDark: {
+  backgroundColor: '#374151',
+},
 })
