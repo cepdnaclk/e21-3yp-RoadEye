@@ -139,7 +139,7 @@ export default function DashboardPage() {
   // ── Highlights — now uses real speed ─────────────────────────────────────
   const highlights = [
     {
-      label: 'Duration',
+      label: 'Max Speed',
       value: '11,857',
       sub: 'updated 15 min ago',
       colors: ['#6846af', '#6846af'],
