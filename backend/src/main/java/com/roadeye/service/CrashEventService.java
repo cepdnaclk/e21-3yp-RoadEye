@@ -54,6 +54,37 @@ public class CrashEventService {
     }
 
     /**
+     * Create a crash event triggered by acceleration + tilt detection.
+     * Called from AccelerationEventService when both thresholds are exceeded.
+     */
+    public CrashEvent createAccidentEvent(UUID userId, Double acceleration,
+                                           Double tiltAngle,
+                                           Double latitude, Double longitude) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        double maxAccel = 15.0;
+        double severity = Math.min(10.0, (acceleration / maxAccel) * 10.0);
+
+        CrashEvent crash = CrashEvent.builder()
+                .user(user)
+                .occurredAt(java.time.LocalDateTime.now())
+                .latitude(latitude   != null ? latitude   : 0.0)
+                .longitude(longitude != null ? longitude  : 0.0)
+                .severityScore(severity)
+                .alertsSent(false)
+                .build();
+
+        CrashEvent saved = crashEventRepository.save(crash);
+
+        if (saved.getSeverityScore() > 7.0) {
+            notifyEmergencyContacts(userId, saved);
+        }
+
+        return saved;
+    }
+
+    /**
      * Get all crash events for a user
      */
     public List<CrashEvent> getUserCrashEvents(UUID userId) {
@@ -77,7 +108,6 @@ public class CrashEventService {
 
         for (EmergencyContact contact : contacts) {
             // TODO: Implement actual SMS/Email sending here
-            // Send notification based on contact.getChannel()
             System.out.println("Sending crash notification to: " + contact.getPhone());
         }
 
