@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { HELMET_STATE } from '../../hooks/useHelmetConnection'
 import { getESP32IP } from '../../utils/ESP32Discovery'
+import useNowPlayingToHelmet from '../../hooks/useNowPlayingToHelmet'
 
 // ── Signal bars ───────────────────────────────────────────────────────────────
 function SignalBars({ level }) {
@@ -51,6 +52,8 @@ function LogModal({ visible, log, onClose }) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function HelmetConnectButton({ helmet, darkMode = false }) {
+  useNowPlayingToHelmet()
+
   const [showLog,    setShowLog]    = useState(false)
   const [editingIp,  setEditingIp]  = useState(false)
   const [ipDraft,    setIpDraft]    = useState('')
@@ -106,10 +109,10 @@ export default function HelmetConnectButton({ helmet, darkMode = false }) {
 
   // ── Button config per state ───────────────────────────────────────────────
   const cfg = {
-    [HELMET_STATE.DISCONNECTED]: { dot: 'rgba(255,255,255,0.4)', label: 'Connect to the helmet',  bg: '#c478e9'},
+    [HELMET_STATE.DISCONNECTED]: { dot: 'rgba(255,255,255,0.4)', label: 'Connect to the helmet',  bg: '#380250'},
     [HELMET_STATE.SCANNING]:     { dot: '#fff',                  label: 'Scanning for helmet...', bg: '#5b3a99' },
-    [HELMET_STATE.CONNECTING]:   { dot: '#fff',                  label: 'Connecting...',           bg: '#c478e9'},
-    [HELMET_STATE.CONNECTED]:    { dot: '#2ecc71',               label: 'Connected to the helmet', bg: '#6846af' },
+    [HELMET_STATE.CONNECTING]:   { dot: '#fff',                  label: 'Connecting...',           bg: '#630592'},
+    [HELMET_STATE.CONNECTED]:    { dot: '#2ecc71',               label: 'Connected to the helmet', bg: '#370846' },
     [HELMET_STATE.ERROR]:        { dot: '#e74c3c',               label: 'Retry connection',        bg: '#c0392b' },
   }[connectionState]
 
@@ -161,7 +164,7 @@ export default function HelmetConnectButton({ helmet, darkMode = false }) {
 
       {/* Connect button */}
       <TouchableOpacity
-        style={[s.btn, { backgroundColor: cfg.bg }, !helmetIp && s.btnDisabled]}
+        style={[s.btn, { backgroundColor: cfg.bg }, s.btnOutline, !helmetIp && s.btnDisabled]}
         onPress={handlePress}
         onLongPress={() => setShowLog(true)}
         activeOpacity={0.85}
@@ -233,6 +236,10 @@ const s = StyleSheet.create({
 
   // Button
   btn:             { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderRadius: 50, paddingVertical: 15, paddingHorizontal: 20, gap: 10 },
+  btnOutline: {
+    borderWidth: 1.5,
+    borderColor: '#2ecc71',
+  },
   btnDisabled:     { opacity: 0.5 },
   dot:             { width: 9, height: 9, borderRadius: 5 },
   btnLabel:        { color: '#fff', fontWeight: '700', fontSize: 15, flex: 1, textAlign: 'center' },
@@ -263,4 +270,6 @@ const s = StyleSheet.create({
   textWhite: {
      color: '#fff',
   },
+
+  
 })
