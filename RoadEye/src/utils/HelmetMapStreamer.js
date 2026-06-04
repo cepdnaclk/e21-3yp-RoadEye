@@ -7,7 +7,7 @@ import HelmetUDP from './HelmetUDP'
 const TARGET_FPS      = 3
 const DIFF_THRESHOLD  = 20
 const DIFF_MIN_PIXELS = 80
-const JPEG_QUALITY    = 0.55
+const JPEG_QUALITY    = 0.65
 const MAP_W           = 112
 const MAP_H           = 112
 const MAX_JPEG_BYTES  = 7800
