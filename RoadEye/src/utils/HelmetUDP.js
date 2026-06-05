@@ -118,25 +118,40 @@ function encodeNavigation({
 //   [4+n]   author       char[]  null-terminated UTF-8
 function encodeMedia({
   progressPct = 0,
-  songName    = '',
-  author      = '',
+  songName = '',
+  author = '',
 }) {
-  const songBytes   = [...songName].map(c => c.charCodeAt(0) & 0xFF)
-  const authorBytes = [...author  ].map(c => c.charCodeAt(0) & 0xFF)
+  // ESP32 MediaPacket format:
+  // [0..3]  progressPct float32 little-endian
+  // [4..]   songName null-terminated string
+  // [next]  author null-terminated string
 
-  // Truncate to fit within MAX_CHUNK_PAYLOAD:
-  //   4 (float) + songLen + 1 (NUL) + authorLen + 1 (NUL) ≤ 250
-  const maxAuthorLen = MAX_CHUNK_PAYLOAD - 4 - songBytes.length - 1 - 1
-  const safeSong     = songBytes.slice(0, Math.min(songBytes.length,   63))
-  const safeAuthor   = authorBytes.slice(0, Math.min(maxAuthorLen,     47))
+  const safeSong = String(songName || 'Unknown Song').slice(0, 63)
+  const safeAuthor = String(author || 'Unknown Artist').slice(0, 47)
 
-  const payload = new Array(4 + safeSong.length + 1 + safeAuthor.length + 1).fill(0)
+  const songBytes = Array.from(safeSong).map(c => c.charCodeAt(0) & 0xff)
+  const authorBytes = Array.from(safeAuthor).map(c => c.charCodeAt(0) & 0xff)
+
+  const payload = new Array(
+    4 + songBytes.length + 1 + authorBytes.length + 1
+  ).fill(0)
+
   writeFloat32LE(payload, 0, progressPct)
+
   let offset = 4
-  safeSong.forEach(b   => { payload[offset++] = b })
-  payload[offset++] = 0                             // NUL-terminate songName
-  safeAuthor.forEach(b => { payload[offset++] = b })
-  payload[offset]   = 0                             // NUL-terminate author
+
+  for (const b of songBytes) {
+    payload[offset++] = b
+  }
+
+  payload[offset++] = 0 // end of songName
+
+  for (const b of authorBytes) {
+    payload[offset++] = b
+  }
+
+  payload[offset++] = 0 // end of author
+
   return payload
 }
 
@@ -300,17 +315,15 @@ class _HelmetUDP {
    */
   sendMedia(fields = {}) {
     const payload = encodeMedia(fields)
-    const hdr     = buildHeader(PKT_MEDIA, this._nextFrameId(), 0, 1, payload.length)
-    this._enqueue([...hdr, ...payload])
-  }
 
-  /**
-   * Send a DateTimePacket (PKT_DATETIME 0x05).
-   * @param {Date} [date]  defaults to now
-   */
-  sendDateTime(date = new Date()) {
-    const payload = encodeDateTime(date)
-    const hdr     = buildHeader(PKT_DATETIME, this._nextFrameId(), 0, 1, payload.length)
+    const hdr = buildHeader(
+      PKT_MEDIA,          // 0x04
+      this._nextFrameId(),
+      0,                  // chunkIdx
+      1,                  // totalChunks
+      payload.length
+    )
+
     this._enqueue([...hdr, ...payload])
   }
 
@@ -345,11 +358,7 @@ class _HelmetUDP {
    * Send a raw PCM audio chunk (PKT_AUDIO 0x02).
    * @param {Uint8Array|number[]} pcmBytes  8-bit unsigned, 8 kHz mono, ≤250 bytes
    */
-  sendAudio(pcmBytes) {
-    const chunk = pcmBytes.slice(0, MAX_CHUNK_PAYLOAD)
-    const hdr   = buildHeader(PKT_AUDIO, this._nextFrameId(), 0, 1, chunk.length)
-    this._enqueue([...hdr, ...chunk])
-  }
+
 
   /** Send a keepalive ping (PKT_PING 0x07). */
   sendPing() {
@@ -379,9 +388,6 @@ class _HelmetUDP {
         break
       case 'jpeg':
         this.sendJpeg(packet.bytes)
-        break
-      case 'audio':
-        this.sendAudio(packet.bytes)
         break
       case 'ping':
         this.sendPing()

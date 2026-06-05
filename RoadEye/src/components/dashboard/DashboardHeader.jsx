@@ -22,7 +22,10 @@ export default function DashboardHeader({
   onHelmetData,
   onConnectionChange,
 }) {
-  const { user } = useAuth()
+  const auth = useAuth()
+  console.log('FULL AUTH CONTEXT:', auth)
+
+  const user = auth?.user
   const navigation = useNavigation()
   const [dropdown, setDropdown] = useState(false)
 
@@ -39,7 +42,9 @@ export default function DashboardHeader({
     }
   }, [helmet.helmetData, onHelmetData])
 
-  const username = user?.username || 'User'
+  console.log('Dashboard user:', user)
+  const username = user?.firstName || user?.username || 'User'
+  console.log('Displayed username:', username)
   const initial = (username?.[0] || 'U').toUpperCase()
 
   const dateText = new Date()
@@ -360,7 +365,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: 21,
-    backgroundColor: '#f97316',
+    backgroundColor: '#1d0932',
     alignItems: 'center',
     justifyContent: 'center',
   },

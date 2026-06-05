@@ -10,7 +10,7 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { api } from '../utils/apiClient'
+import { apiMultipart } from '../utils/apiClient'
 import { useAppSettings } from '../hooks/useAppSettings'
 
 export default function ChangeProfilePage({ navigation }) {
@@ -59,19 +59,8 @@ export default function ChangeProfilePage({ navigation }) {
   }
 
   const saveProfile = async () => {
-    if (password || rePassword) {
-      Alert.alert(
-        'Not supported yet',
-        'Your current backend only supports first name, last name, and phone number update.'
-      )
-      return
-    }
-
-    if (image) {
-      Alert.alert(
-        'Not supported yet',
-        'Profile image update needs a new backend multipart endpoint.'
-      )
+    if (password && password !== rePassword) {
+      Alert.alert('Error', 'Passwords do not match')
       return
     }
 
@@ -83,11 +72,29 @@ export default function ChangeProfilePage({ navigation }) {
         return
       }
 
-      await api.put(`/users/${userId}`, {
-        firstName: username.trim(),
-        lastName: '',
-        phoneNumber: '',
-      })
+      const formData = new FormData()
+
+      if (username.trim()) {
+        formData.append('firstName', username.trim())
+      }
+
+      if (email.trim()) {
+        formData.append('email', email.trim())
+      }
+
+      if (password.trim()) {
+        formData.append('password', password.trim())
+      }
+
+      if (image) {
+        formData.append('profileImage', {
+          uri: image,
+          name: 'profile.jpg',
+          type: 'image/jpeg',
+        })
+      }
+
+      await apiMultipart(`/users/${userId}/profile`, formData, 'PUT')
 
       Alert.alert('Success', 'Profile updated successfully')
       navigation.goBack()

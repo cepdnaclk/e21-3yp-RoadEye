@@ -8,6 +8,7 @@ export function AuthProvider({ children }) {
   const [isLoading,  setIsLoading]  = useState(true)
   const [userId,     setUserId]     = useState(null)
   const [token,      setToken]      = useState(null)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const checkToken = async () => {
@@ -24,6 +25,7 @@ export function AuthProvider({ children }) {
           // Pull userId from stored user object if available
           if (storedUser) {
             const parsed = JSON.parse(storedUser)
+            setUser(parsed)
             setUserId(parsed.id ?? parsed.userId ?? null)
           }
         }
@@ -49,6 +51,7 @@ export function AuthProvider({ children }) {
       console.error('[Auth] login save error:', e)
     }
     setToken(jwtToken)
+    setUser(userObject)
     setUserId(userObject.id ?? userObject.userId ?? null)
     setIsLoggedIn(true)
   }
@@ -63,12 +66,13 @@ export function AuthProvider({ children }) {
       console.error('[Auth] logout error:', e)
     }
     setToken(null)
+    setUser(null)
     setUserId(null)
     setIsLoggedIn(false)
   }
 
   return (
-    <AuthContext.Provider value={{ isLoggedIn, isLoading, userId, token, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, isLoading, user, userId, token, user, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

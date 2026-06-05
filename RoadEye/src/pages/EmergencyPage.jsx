@@ -10,6 +10,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { colors } from '../utils/theme'
 import BottomNav from '../components/dashboard/BottomNav'
 import { useAppSettings } from '../hooks/useAppSettings'
+import { useNavigation } from '@react-navigation/native'
+import { useAuth } from '../hooks/useAuth'
 
 const C = colors
 
@@ -73,6 +75,8 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
   const { darkMode, textScale } = useAppSettings()
   const [activeTab, setActiveTab] = useState('emergency')
   const isLoadingContactsRef = useRef(false)
+  const navigation = useNavigation()
+  const { logout } = useAuth()
 
   // ── Core state ────────────────────────────────────────────────────────────
   const [emergencyContacts, setEmergencyContacts] = useState([])
@@ -606,18 +610,18 @@ export default function EmergencyPage({ userName = 'Alex', userInitial = 'H', on
               <Text style={styles.profileMenuName}>Hirushi</Text>
             </View>
             <View style={styles.profileMenuDivider} />
-            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Change Profile', 'Hook up your navigation here.') }}>
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); navigation.navigate('ChangeProfile') }}>
               <Text style={styles.profileMenuItemIcon}>👤</Text>
               <Text style={styles.profileMenuItemText}>Change Profile</Text>
               <Text style={styles.profileMenuItemArrow}>›</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Settings', 'Hook up your navigation here.') }}>
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); navigation.navigate('Settings') }}>
               <Text style={styles.profileMenuItemIcon}>⚙️</Text>
               <Text style={styles.profileMenuItemText}>Settings</Text>
               <Text style={styles.profileMenuItemArrow}>›</Text>
             </TouchableOpacity>
             <View style={styles.profileMenuDivider} />
-            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); Alert.alert('Log Out', 'Are you sure?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Log Out', style: 'destructive', onPress: () => {} }]) }}>
+            <TouchableOpacity style={styles.profileMenuItem} onPress={() => { setShowProfileMenu(false); logout(); navigation.reset({ index: 0, routes: [{ name: 'Login' }] }); Alert.alert('Log Out', 'Are you sure?', [{ text: 'Cancel', style: 'cancel' }, { text: 'Log Out', style: 'destructive', onPress: () => {} }]) }}>
               <Text style={styles.profileMenuItemIcon}>🚪</Text>
               <Text style={[styles.profileMenuItemText, { color: '#EF4444' }]}>Log Out</Text>
               <Text style={[styles.profileMenuItemArrow, { color: '#EF4444' }]}>›</Text>
