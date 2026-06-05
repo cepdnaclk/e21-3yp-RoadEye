@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -67,6 +68,12 @@ public class RideController {
     public ResponseEntity<?> deleteRide(@PathVariable UUID rideId) {
         rideService.deleteRide(rideId);
         return ResponseEntity.ok("Ride deleted successfully");
+    }
+
+    @GetMapping("/user/{userId}/total-distance")
+    public ResponseEntity<?> getUserTotalDistance(@PathVariable UUID userId) {
+        Double totalDistance = rideService.getUserTotalDistance(userId);
+        return ResponseEntity.ok(Map.of("totalDistance", totalDistance));
     }
 
     private RideDTO toDTO(Ride ride) {
