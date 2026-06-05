@@ -254,11 +254,6 @@ export default function DashboardPage() {
 
     {
       label: 'Safety Score',
-<<<<<<< HEAD
-      sub: speedSub,
-      colors: ['#6846af', '#6846af'],
-      icon: '🚴',
-=======
       value: safetyScore !== null ? `${Number(safetyScore).toFixed(0)}/100` : '--',
       sub: safetyLoading
         ? 'updating...'
@@ -274,7 +269,6 @@ export default function DashboardPage() {
           : safetyScore >= 80   ? '🛡️'
           : safetyScore >= 60   ? '⚠️'
           :                       '🚨',
->>>>>>> origin/main
     },
   ]
 
