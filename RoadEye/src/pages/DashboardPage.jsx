@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native'
 import { useAuth } from '../hooks/useAuth'
 import { useAppSettings } from '../hooks/useAppSettings'
 import { colors } from '../utils/theme'
-import Svg, { Path } from 'react-native-svg'
+import Svg, { Circle } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 
@@ -271,6 +271,35 @@ export default function DashboardPage() {
           :                       '🚨',
     },
   ]
+  
+
+  const KM_PER_CIRCLE = 100
+
+  const distanceValue = Math.max(0, Number(totalDistance) || 0)
+  const completedCircles = Math.floor(distanceValue / KM_PER_CIRCLE)
+  const currentCircleKm = distanceValue % KM_PER_CIRCLE
+  const circleProgress = currentCircleKm / KM_PER_CIRCLE
+
+  const circleSize = 190
+  const circleStroke = 12
+  const circleRadius = 70
+  const circleCenter = circleSize / 2
+  const circleCircumference = 2 * Math.PI * circleRadius
+
+  const circleDashOffset =
+    circleCircumference * (1 - circleProgress)
+
+  const circleColors = [
+    '#9d7bd7',
+    '#10b981',
+    '#3b82f6',
+    '#f59e0b',
+    '#ef4444',
+    '#eab308',
+  ]
+
+  const activeCircleColor =
+    circleColors[Math.min(completedCircles, circleColors.length - 1)]
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top },darkMode && styles.screenDark]}>
@@ -303,23 +332,34 @@ export default function DashboardPage() {
         />
 
         <View style={styles.odometerWrap}>
-          <Svg width={180} height={110} viewBox="0 0 180 110">
-            <Path
-              d="M 20 100 A 50 50 0 0 1 160 100"
-              fill="none"
+          <Svg width={circleSize} height={circleSize} viewBox={`0 0 ${circleSize} ${circleSize}`}>
+            {/* Background circle */}
+            <Circle
+              cx={circleCenter}
+              cy={circleCenter}
+              r={circleRadius}
               stroke={darkMode ? '#374151' : '#E5E7EB'}
-              strokeWidth={10}
-              strokeLinecap="round"
-            />
-            <Path
-              d="M 20 100 A 50 50 0 0 1 160 100"
+              strokeWidth={circleStroke}
               fill="none"
-              stroke="#9d7bd7"
-              strokeWidth={10}
-              strokeLinecap="round"
-              strokeDasharray={240}
-              strokeDashoffset={60}
             />
+
+            {/* Progress circle */}
+            {distanceValue > 0 && (
+              <Circle
+                cx={circleCenter}
+                cy={circleCenter}
+                r={circleRadius}
+                stroke={activeCircleColor}
+                strokeWidth={circleStroke}
+                fill="none"
+                strokeLinecap="round"
+                strokeDasharray={`${circleCircumference} ${circleCircumference}`}
+                strokeDashoffset={circleDashOffset}
+                rotation="-90"
+                originX={circleCenter}
+                originY={circleCenter}
+              />
+            )}
           </Svg>
 
           <View style={styles.odometerLabel}>
@@ -330,7 +370,7 @@ export default function DashboardPage() {
                 darkMode && styles.textWhite,
               ]}
             >
-              {distanceLoading ? '...' : Number(totalDistance).toFixed(1)}
+              {distanceLoading ? '...' : `${Number(totalDistance).toFixed(1)} km`}
             </Text>
 
             <View style={[styles.odometerBadge, darkMode && styles.badgeDark]}>
@@ -343,6 +383,15 @@ export default function DashboardPage() {
                 Total Distance
               </Text>
             </View>
+            <Text
+              style={[
+                styles.circleCountText,
+                { fontSize: 10 * textScale },
+                darkMode && styles.textWhite,
+              ]}
+            >
+              {completedCircles} full circle{completedCircles === 1 ? '' : 's'}
+            </Text>
           </View>
         </View>
 
@@ -536,8 +585,8 @@ function SectionHeader({
 const styles = StyleSheet.create({
   screen:            { flex: 1, backgroundColor: C.bg },
   scroll:            { paddingHorizontal: 16, paddingBottom: 20 },
-  odometerWrap:      { alignItems: 'center', marginBottom: 20, position: 'relative' },
-  odometerLabel:     { position: 'absolute', bottom: 10, alignItems: 'center' },
+  odometerWrap:      { alignItems: 'center', justifyContent: 'center', marginBottom: 20, position: 'relative', height: 200 ,},
+  odometerLabel:     { position: 'absolute', top: 60, alignItems: 'center' },
   odometerVal:       { fontSize: 22, fontWeight: '800', color: '#1a1a2e' },
   odometerBadge:     { borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, marginTop: 2 },
   odometerBadgeText: { fontSize: 10, color: '#8892A4', fontWeight: '500' },
@@ -567,6 +616,11 @@ const styles = StyleSheet.create({
   textWhite:         {color: '#fff',},
   badgeDark:         {borderColor: '#374151',},
   screenDark:        {backgroundColor: '#111827',},
+  circleCountText: {
+    marginTop: 4,
+    color: '#8892A4',
+    fontWeight: '600',
+  },
 })
 
 
