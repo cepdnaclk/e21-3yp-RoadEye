@@ -11,6 +11,7 @@ import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 import { sendSpeedEvent, getLatestSpeed, getMaxSpeed } from '../api/speedApi'
 import { sendTiltEvent } from '../api/tiltApi'
 import { getSafetyScore } from '../api/safetyScoreApi'
+import { getTotalDistance } from '../api/rideApi'
 
 import { sendAccelerationEvent } from '../api/accelerationApi'
 
@@ -46,6 +47,8 @@ export default function DashboardPage() {
   const [maxSpeed, setMaxSpeed] = useState(0) // ← max speed from DB
   const [safetyScore,   setSafetyScore]   = useState(null)
   const [safetyLoading, setSafetyLoading] = useState(false)
+  const [totalDistance,  setTotalDistance]  = useState(0)
+  const [distanceLoading, setDistanceLoading] = useState(false)
 
   const handleHelmetData = useCallback((data) => {
     if (data) setHelmetData(data)
@@ -85,6 +88,21 @@ export default function DashboardPage() {
 
     fetchMaxSpeed()
 
+  }, [])
+
+  // ── Fetch total distance on mount and every 60s ───────────────────────
+  useEffect(() => {
+    const fetchDist = async () => {
+      setDistanceLoading(true)
+      const result = await getTotalDistance(userId, token)
+      if (result?.totalDistance !== undefined) {
+        setTotalDistance(result.totalDistance)
+      }
+      setDistanceLoading(false)
+    }
+    fetchDist()
+    const interval = setInterval(fetchDist, 60000)
+    return () => clearInterval(interval)
   }, [])
 
   // ── Fetch safety score on mount and every 30s ─────────────────────────
@@ -312,7 +330,7 @@ export default function DashboardPage() {
                 darkMode && styles.textWhite,
               ]}
             >
-              11,857
+              {distanceLoading ? '...' : Number(totalDistance).toFixed(1)}
             </Text>
 
             <View style={[styles.odometerBadge, darkMode && styles.badgeDark]}>
