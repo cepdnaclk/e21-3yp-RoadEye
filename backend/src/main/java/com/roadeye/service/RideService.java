@@ -70,6 +70,12 @@ public class RideService {
         rideRepository.deleteById(id);
     }
 
+    @Transactional(readOnly = true)
+    public Double getUserTotalDistance(UUID userId) {
+        Double total = rideRepository.getTotalDistanceByUserId(userId);
+        return total != null ? total : 0.0;
+    }
+
     private RideDTO toDTO(Ride ride) {
         return RideDTO.builder()
                 .id(ride.getId())

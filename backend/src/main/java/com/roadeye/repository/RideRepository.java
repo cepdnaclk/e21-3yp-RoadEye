@@ -2,6 +2,8 @@ package com.roadeye.repository;
 
 import com.roadeye.model.Ride;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -18,4 +20,7 @@ public interface RideRepository extends JpaRepository<Ride, UUID> {
             UUID userId,
             LocalDateTime startTime,
             LocalDateTime endTime);
+    
+    @Query("SELECT COALESCE(SUM(r.distanceKm), 0.0) FROM Ride r WHERE r.user.id = :userId AND r.distanceKm IS NOT NULL")
+    Double getTotalDistanceByUserId(@Param("userId") UUID userId);
 }
