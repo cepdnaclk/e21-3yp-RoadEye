@@ -10,6 +10,7 @@ import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 
 import { sendSpeedEvent, getLatestSpeed, getMaxSpeed } from '../api/speedApi'
 import { sendTiltEvent } from '../api/tiltApi'
+import { getSafetyScore } from '../api/safetyScoreApi'
 
 import { sendAccelerationEvent } from '../api/accelerationApi'
 
@@ -43,6 +44,8 @@ export default function DashboardPage() {
   const [helmetConnected,  setHelmetConnected]  = useState(false)
   const [confirmedSpeed,   setConfirmedSpeed]   = useState(0)   // ← last speed saved to DB
   const [maxSpeed, setMaxSpeed] = useState(0) // ← max speed from DB
+  const [safetyScore,   setSafetyScore]   = useState(null)
+  const [safetyLoading, setSafetyLoading] = useState(false)
 
   const handleHelmetData = useCallback((data) => {
     if (data) setHelmetData(data)
@@ -55,15 +58,15 @@ export default function DashboardPage() {
   const navSession = useNavSession()
 
   // ── On mount: load last confirmed speed from backend ─────────────────────
-  useEffect(() => {
-    const fetchLastSpeed = async () => {
-      const result = await getLatestSpeed(userId, token)
-      if (result?.speed !== undefined) {
-        setConfirmedSpeed(result.speed)
-      }
-    }
-    fetchLastSpeed()
-  }, [])
+  // useEffect(() => {
+  //   const fetchLastSpeed = async () => {
+  //     const result = await getLatestSpeed(userId, token)
+  //     if (result?.speed !== undefined) {
+  //       setConfirmedSpeed(result.speed)
+  //     }
+  //   }
+  //   fetchLastSpeed()
+  // }, [])
 
   // ── get max speed ─────────────────────
   useEffect(() => {
@@ -82,6 +85,22 @@ export default function DashboardPage() {
 
     fetchMaxSpeed()
 
+  }, [])
+
+  // ── Fetch safety score on mount and every 30s ─────────────────────────
+  useEffect(() => {
+    const fetchSafety = async () => {
+      setSafetyLoading(true)
+      const result = await getSafetyScore(userId, token)
+      if (result?.safetyScore !== undefined) {
+        setSafetyScore(result.safetyScore)
+      }
+      setSafetyLoading(false)
+    }
+
+    fetchSafety()
+    const interval = setInterval(fetchSafety, 30000)
+    return () => clearInterval(interval)
   }, [])
 
   // ── Send speed every 5s when helmet is connected ──────────────────────────
@@ -207,12 +226,31 @@ export default function DashboardPage() {
       colors: ['#6846af', '#6846af'],
       icon: '🏁',
     },
+    // {
+    //   label: 'Current Speed',
+    //   value: `${liveSpeed} km/h`,
+    //   sub: speedSub,
+    //   colors: ['#6846af', '#6846af'],
+    //   icon: '🚴',
+    // },
+
     {
-      label: 'Current Speed',
-      value: `${liveSpeed} km/h`,
-      sub: speedSub,
-      colors: ['#6846af', '#6846af'],
-      icon: '🚴',
+      label: 'Safety Score',
+      value: safetyScore !== null ? `${Number(safetyScore).toFixed(0)}/100` : '--',
+      sub: safetyLoading
+        ? 'updating...'
+        : safetyScore >= 80 ? 'safe driving 🟢'
+        : safetyScore >= 60 ? 'drive carefully 🟡'
+        : safetyScore !== null ? 'unsafe patterns 🔴'
+        : 'no data yet',
+      colors: safetyScore === null   ? ['#6846af', '#6846af']
+            : safetyScore >= 80      ? ['#10b981', '#10b981']
+            : safetyScore >= 60      ? ['#d97706', '#d97706']
+            :                          ['#dc2626', '#dc2626'],
+      icon: safetyScore === null ? '🛡️'
+          : safetyScore >= 80   ? '🛡️'
+          : safetyScore >= 60   ? '⚠️'
+          :                       '🚨',
     },
   ]
 
