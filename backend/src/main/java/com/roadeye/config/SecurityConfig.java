@@ -38,7 +38,8 @@ public class SecurityConfig {
                                 "/api/users/login",
                                 "/api/auth/**",
                                 "/api/tilt/event",
-                                "/acceleration/**")
+                                "/acceleration/**",
+                                "/safety-score/**")
                                 // "/api/speed/**")
                         .permitAll()
                         .requestMatchers("/api/speed/**").authenticated()
