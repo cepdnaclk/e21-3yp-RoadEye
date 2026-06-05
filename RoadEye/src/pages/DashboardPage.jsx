@@ -208,8 +208,7 @@ export default function DashboardPage() {
       icon: '🏁',
     },
     {
-      label: 'Current Speed',
-      value: `${liveSpeed} km/h`,
+      label: 'Safety Score',
       sub: speedSub,
       colors: ['#6846af', '#6846af'],
       icon: '🚴',
@@ -306,7 +305,7 @@ export default function DashboardPage() {
                 <Text
                   style={[
                     styles.highlightLabel,
-                    { fontSize: 11 * textScale },
+                    { fontSize: 13 * textScale },
                   ]}
                 >
                   {h.label}
