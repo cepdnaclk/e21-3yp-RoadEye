@@ -11,6 +11,8 @@ import { useNavSession, stopNavSession } from '../utils/NavigationSession'
 import { sendSpeedEvent, getLatestSpeed, getMaxSpeed } from '../api/speedApi'
 import { sendTiltEvent } from '../api/tiltApi'
 
+import { sendAccelerationEvent } from '../api/accelerationApi'
+
 import DashboardHeader from '../components/dashboard/DashboardHeader'
 import WeatherCard from '../components/dashboard/WeatherCard'
 import MusicPlayer from '../components/dashboard/MusicPlayer'
@@ -29,6 +31,8 @@ export default function DashboardPage() {
 
   const lastSentRef     = useRef(0)
   const lastTiltSentRef = useRef(0)
+
+  const lastAccelSentRef = useRef(0)
 
   // ── Replace properly later ────────────────────────────────────────────────
   const userId = "1f84393a-7f45-46c8-9261-cb313fc1dce9"
@@ -144,6 +148,41 @@ export default function DashboardPage() {
     sendTilt()
 
   }, [helmetData, helmetConnected, userId, token])
+
+  // ── Acceleration + accident detection ────────────────────────────────────
+  useEffect(() => {
+    if (!helmetData || !helmetConnected || !userId || !token) return
+
+    const now = Date.now()
+    if (now - lastAccelSentRef.current < 3000) return
+    lastAccelSentRef.current = now
+
+    // helmetData needs accelX/Y/Z from BLE — see ESP32 note below
+    const accelX = helmetData.accelX ?? 0
+    const accelY = helmetData.accelY ?? 0
+    const accelZ = helmetData.accelZ ?? 0
+    const accelMagnitude = Math.sqrt(accelX ** 2 + accelY ** 2 + accelZ ** 2)
+
+    const payload = {
+      userId,
+      acceleration: accelMagnitude,
+      tiltAngle:    helmetData.roll ?? 0,
+      latitude:     helmetData.latitude  ?? 6.9,
+      longitude:    helmetData.longitude ?? 79.8,
+      timestamp:    now,
+    }
+
+    const send = async () => {
+      const res = await sendAccelerationEvent(payload, token)
+      if (res?.accidentDetected) {
+        Alert.alert(
+          "🚨 Accident Detected",
+          "High acceleration and dangerous tilt detected. Sending alert."
+        )
+      }
+    }
+  send()
+  }, [helmetData, helmetConnected])
 
   // ── Live speed display ────────────────────────────────────────────────────
   // Priority: live helmet → last confirmed from DB → '--'

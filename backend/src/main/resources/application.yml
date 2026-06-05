@@ -48,8 +48,11 @@ spring:
 
 roadeye:
   tilt:
-    threshold: 21.0
+    threshold: 45.0
     cooldown-seconds: 300
+  acceleration:
+    threshold: 15.0 # m/s² (roughly 1.5G)
+    severity-multiplier: 6.67 # (100 / 15)
 
 # Logging Configuration
 logging:

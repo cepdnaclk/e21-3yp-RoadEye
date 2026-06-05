@@ -37,7 +37,8 @@ public class SecurityConfig {
                                 "/api/users/register",
                                 "/api/users/login",
                                 "/api/auth/**",
-                                "/api/tilt/event")
+                                "/api/tilt/event",
+                                "/acceleration/**")
                                 // "/api/speed/**")
                         .permitAll()
                         .requestMatchers("/api/speed/**").authenticated()

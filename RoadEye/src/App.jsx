@@ -42,6 +42,10 @@ function RootNavigator() {
         console.log('[Notification] Tilt alert received — triggering SMS')
         emergencyActionRef.current?.()
       }
+      if (data?.type === 'accident') {
+        console.log('[Notification] Accident alert received — triggering emergency')
+        emergencyActionRef.current?.()
+      }
     })
     return () => subscription.remove()
   }, [])
