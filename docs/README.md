@@ -63,6 +63,8 @@ Key challenges faced by motorcycle riders include:
 
 There is a need for a hands-free, real-time, intelligent safety system that improves awareness and ensures rapid emergency handling.
 
+---
+
 ## Solution Architecture
 
 <p align="center">
