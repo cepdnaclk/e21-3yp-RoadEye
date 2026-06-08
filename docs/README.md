@@ -25,6 +25,14 @@ title: RoadEye
 <!-- This is a sample image, to show how to add images to your page. To learn more options, please refer [this](https://projects.ce.pdn.ac.lk/docs/faq/how-to-add-an-image/) -->
 
 <!-- ![Sample Image](./images/sample.png) -->
+## Technologies Used
+- ESP32
+- React Native (Expo)
+- Spring Boot
+- PostgreSQL
+- AWS
+
+---
 
 #### Table of Contents
 1. [Introduction](#introduction)
@@ -35,22 +43,26 @@ title: RoadEye
 6. [Conclusion](#conclusion)
 7. [Links](#links)
 
+---
+
 ## Introduction
 
-Motorcycle riders are among the most vulnerable road users, with accidents often 
-caused by limited situational awareness, delayed reactions, and driver distraction. This 
-project proposes the development of a smart motorcycle helmet system aimed at 
-significantly enhancing rider safety while minimizing cognitive and visual load. By 
-combining sensor fusion, real-time hazard detection, and carefully designed 
-human–machine interaction, the smart helmet delivers critical information through 
-eyes-free and hands-free feedback methods such as haptics, audio, and minimal HUD 
-visuals. The system prioritizes essential alerts, adaptive warnings, and context-aware 
-assistance to ensure that riders remain focused on the road at all times. Through 
-intelligent design and embedded safety features, the proposed smart helmet seeks to 
-reduce accident risk, improve riding awareness, and create a safer and more intuitive 
-riding experience.
+Motorcycle riders face significantly higher risks compared to car drivers due to limited situational awareness, lack of advanced driver-assistance systems, and delayed emergency response. RoadEye is a smart motorcycle safety system designed to enhance rider awareness while minimizing distraction.
 
+The system combines embedded sensing, real-time data processing, mobile intelligence, and cloud-based services to deliver critical information through HUD visuals, audio alerts, and haptic feedback, ensuring safer riding without cognitive overload.
 ---
+
+
+## Problem Statement
+Key challenges faced by motorcycle riders include:
+
+- Blind spots caused by helmet design
+- Poor visibility in rain, fog, and low-light conditions
+- Distraction caused by mobile navigation
+- Lack of real-time collision awareness
+- Delayed emergency response after accidents
+
+There is a need for a hands-free, real-time, intelligent safety system that improves awareness and ensures rapid emergency handling.
 
 ## Solution Architecture
 
@@ -60,34 +72,32 @@ riding experience.
 
 ### Description
 
-The RoadEye system follows a distributed smart system architecture with three main components:
+The RoadEye system follows a distributed smart system architecture consisting of three main components:
 
-1. Helmet Unit (User Interface Layer)
-- Acts as the primary interaction interface
-- Displays alerts using HUD
-- Provides audio + haptic feedback
-- Processes real-time alerts from Bike Module
-  
-2. Bike Module (Sensing & Detection Layer)
-- Core data acquisition unit
-- Collects environmental and motion data
-- Performs edge-level processing
-- Sends processed alerts to Helmet
-  
-3. Mobile Application (Intelligence Layer)
-- Performs high-level processing & analytics
-- Stores ride history
-- Handles user preferences & emergency communication
-  
-Data Flow
-- Sensors → Bike Module
-- Bike Module → Helmet (real-time alerts)
-- Helmet ↔ Mobile App (data sync, configuration)
-- Crash event → Mobile App → Emergency contacts
+### 1. Helmet Unit (User Interface Layer)
+- Acts as the primary rider interaction interface  
+- Displays alerts using a heads-up display (HUD)  
+- Provides audio and haptic feedback  
+- Renders real-time alerts received from the bike module  
+
+### 2. Bike Module (Sensing & Detection Layer)
+- Core data acquisition unit  
+- Collects environmental and motion data  
+- Performs edge-level processing  
+- Sends processed alerts to the helmet  
+
+### 3. Mobile Application (Intelligence Layer)
+- Performs high-level processing and analytics  
+- Stores ride history  
+- Manages user preferences and emergency communication  
+
+### Data Flow
+- Sensors → Bike Module  
+- Bike Module → Helmet (real-time alerts)  
+- Helmet ↔ Mobile App (data synchronization & configuration)  
+- Crash event → Mobile App → Emergency contacts  
 
 ---
-
-
 
 ## Hardware and Software Designs
 
@@ -95,130 +105,88 @@ Data Flow
 
 #### 🔹 1. Helmet Unit Hardware
 
-**a) Processing Unit**
-- Microcontroller (ESP32 / similar)  
-- Handles:
-  - Sensor input  
-  - Communication  
-  - Alert generation  
+**Processing Unit**
+- ESP32 microcontroller  
+- Handles sensor input, communication, and alert generation  
 
-**b) Display System (HUD)**
+**Display System (HUD)**
+- TFT micro-display  
 - Fresnel lens  
 - Reflective combiner  
-- Micro-display  
 
-**Purpose:**
+**Purpose**
 - Create a virtual distant image  
-- Reduce eye strain  
+- Reduce eye strain and distraction  
 
-**c) Audio System**
-- Stereo speakers inside padding  
-- Noise-optimized output  
+**Audio System**
+- Stereo speakers integrated into helmet padding  
 
-**d) Haptic Feedback System**
-- Small vibration motors near ears  
+**Haptic Feedback**
+- Small vibration motors near the ears  
+- Used for collision and warning alerts  
 
-**Used for:**
-- Collision alerts  
-- Warnings without visual overload  
+**Sensors**
+- 9-Axis IMU – head motion and crash detection  
+- Hall effect sensor – buckle detection  
+- Capacitive sensor – helmet wear detection  
 
-**e) Sensors**
-- 9-Axis IMU → head motion & crash detection  
-- Hall Effect Sensor → buckle detection  
-- Capacitive Sensor → helmet wear detection  
-
-**f) Power System**
-- LiPo battery  
-- Charging module (USB-C)  
+**Power System**
+- Li-Po battery  
+- USB-C charging module  
 - Voltage regulation  
-
 
 
 #### 🔹 2. Bike Module Hardware
 
-**a) Processing Unit**
-- ESP32 / similar microcontroller  
+**Processing Unit**
+- ESP32 microcontroller  
 
-**b) Distance Sensors**
-- Ultrasonic / ToF sensors (rear + sides)  
+**Distance Sensors**
+- Ultrasonic / ToF sensors (rear and sides)  
+- Used to detect approaching vehicles  
 
-**Purpose:**
-- Detect vehicles approaching from behind  
-
-**c) Environmental Sensors**
+**Environmental Sensors**
 - Temperature  
 - Humidity  
 - Pressure  
-- Light sensor  
+- Ambient light  
 
-**d) Motion Sensors**
-- 9-Axis IMU → tilt, crash, braking  
-- Vibration sensor → road condition  
+**Motion Sensors**
+- 9-Axis IMU – tilt, braking, crash detection  
+- Vibration sensor – road condition analysis  
 
-**e) Anti-Theft System**
+**Anti-Theft Function**
 - Detects movement when parked  
-- Sends alert to mobile
+- Sends alert to mobile application  
 
-  
+---
+
 #### 🔹 3. Communication
 - WiFi-based communication  
-- Optional Bluetooth pairing for authentication
+- Optional Bluetooth pairing for authentication  
 
-
-
+---
 
 ### 💻 Software Design
 
 #### 🔹 1. Embedded Software (Helmet & Bike)
-
-**a) Sensor Data Processing**
-- Filtering (noise reduction)  
-- Threshold-based detection  
-- Event triggering  
-
-**b) Alert System Logic**
-- Priority-based alerts:
-  - Crash  
-  - Collision risk  
-  - Weather warning  
-  - Notifications  
-
-**c) Power Management**
-- Sleep modes  
-- Sensor duty cycling  
-
-
-
+- Sensor data filtering and noise reduction  
+- Threshold-based event detection  
+- Priority-based alert handling  
+- Power management using sleep modes  
 
 #### 🔹 2. Mobile Application
-
-**a) Frontend**
-- Dashboard (speed, alerts, environment)  
-- Ride analytics UI  
-- Notifications panel  
-
-**b) Backend Logic**
-- Data processing  
-- Ride analysis  
-- Risk scoring  
-
-**c) Emergency System**
-- Auto SMS/call during crash  
-- Location sharing  
-
-**d) OTA Updates**
-- Firmware updates via app  
-
-
-
+- Dashboard displaying speed, alerts, and environment data  
+- Ride analytics and statistics  
+- Emergency contact management  
+- Device pairing and configuration  
 
 #### 🔹 3. Data Flow Design
 - Real-time data → Helmet alerts  
 - Logged data → Mobile app storage  
-- Processed data → Analytics dashboard
+- Processed data → Analytics dashboard  
 
---- 
-
+---
 
 ## Testing
 
@@ -291,7 +259,6 @@ Tested with real users (motorcycle riders):
 
 - Real-time alert accuracy: **High**  
 - System latency: **Low**  
-- User distraction: **Minimal**  
 - Overall reliability: **Stable under most conditions**
 
 ---
@@ -329,14 +296,13 @@ All items and associated costs for the RoadEye system are summarized below.
 
 ### 🎯 What Was Achieved
 
-The RoadEye system successfully demonstrates a complete smart motorcycle safety solution by integrating multiple hardware and software components into a unified platform.
+The RoadEye system successfully demonstrates a **complete smart motorcycle safety solution** by integrating hardware, firmware, mobile software, and cloud services into a unified platform.
 
 **Key achievements include:**
-- Development of a fully functional smart helmet system  
-- Successful integration of:
-  - Helmet-based alert mechanisms  
-  - Bike-mounted sensor module  
-  - Mobile application for intelligence and analytics  
+- Fully functional smart helmet system  
+- Reliable collision and crash detection  
+- Automated emergency alert system  
+- Minimal rider distraction through optimized human–machine interaction  
 
 **System capabilities:**
 - Real-time collision warning system  
