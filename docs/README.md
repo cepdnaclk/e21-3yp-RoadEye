@@ -47,9 +47,8 @@ title: RoadEye
 
 ## Introduction
 
-Motorcycle riders face significantly higher risks compared to car drivers due to limited situational awareness, lack of advanced driver-assistance systems, and delayed emergency response. RoadEye is a smart motorcycle safety system designed to enhance rider awareness while minimizing distraction.
+Motorcycle riders face significantly higher risks compared to car drivers due to limited situational awareness, lack of advanced driver-assistance systems, and delayed emergency response. RoadEye is a smart motorcycle safety system designed to enhance rider awareness while minimizing distraction.The system combines embedded sensing, real-time data processing, mobile intelligence, and cloud-based services to deliver critical information through HUD visuals, audio alerts, and haptic feedback, ensuring safer riding without cognitive overload.
 
-The system combines embedded sensing, real-time data processing, mobile intelligence, and cloud-based services to deliver critical information through HUD visuals, audio alerts, and haptic feedback, ensuring safer riding without cognitive overload.
 ---
 
 
