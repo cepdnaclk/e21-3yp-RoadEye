@@ -47,9 +47,7 @@ title: RoadEye
 
 ## Introduction
 
-Motorcycle riders face significantly higher risks compared to car drivers due to limited situational awareness, lack of advanced driver-assistance systems, and delayed emergency response. RoadEye is a smart motorcycle safety system designed to enhance rider awareness while minimizing distraction.
-
-The system combines embedded sensing, real-time data processing, mobile intelligence, and cloud-based services to deliver critical information through HUD visuals, audio alerts, and haptic feedback, ensuring safer riding without cognitive overload.
+Motorcycle riders face significantly higher risks compared to car drivers due to limited situational awareness, lack of advanced driver-assistance systems, and delayed emergency response. RoadEye is a smart motorcycle safety system designed to enhance rider awareness while minimizing distraction. The system combines embedded sensing, real-time data processing, mobile intelligence, and cloud-based services to deliver critical information through HUD visuals, audio alerts, and haptic feedback, ensuring safer riding without cognitive overload.
 ---
 
 
@@ -69,6 +67,8 @@ There is a need for a hands-free, real-time, intelligent safety system that impr
 <p align="center">
   <img src="./images/system-flow-chart2.png" width="600">
 </p>
+
+---
 
 ### Description
 
@@ -135,6 +135,7 @@ The RoadEye system follows a distributed smart system architecture consisting of
 - USB-C charging module  
 - Voltage regulation  
 
+---
 
 #### 🔹 2. Bike Module Hardware
 
@@ -158,8 +159,6 @@ The RoadEye system follows a distributed smart system architecture consisting of
 **Anti-Theft Function**
 - Detects movement when parked  
 - Sends alert to mobile application  
-
----
 
 #### 🔹 3. Communication
 - WiFi-based communication  
@@ -307,8 +306,9 @@ The RoadEye system successfully demonstrates a **complete smart motorcycle safet
 **System capabilities:**
 - Real-time collision warning system  
 - Reliable crash detection with emergency alert functionality  
-- Minimal rider distraction through optimized human–machine interaction  
+- Minimal rider distraction through optimized human–machine interaction
 
+---
 
 ### 🔮 Future Developments
 
@@ -320,6 +320,7 @@ Several enhancements can further improve the system:
 - Integration with smart traffic infrastructure  
 - Voice assistant for hands-free control  
 
+---
 
 ### 💼 Commercialization Plan
 
