@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   View, Text, TouchableOpacity, StyleSheet,
-  Linking, Alert,
+  Linking, Alert, DeviceEventEmitter, Platform,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import NotificationListener from 'react-native-android-notification-listener'
 import * as DocumentPicker from 'expo-document-picker'
 import * as FileSystem from 'expo-file-system'
 import { WebView } from 'react-native-webview'
@@ -181,7 +180,6 @@ export default function MusicPlayer() {
   const [trackName, setTrackName]         = useState(null)
   const [artist, setArtist]               = useState(null)
   const [isPlaying, setIsPlaying]         = useState(false)
-  const [hasPermission, setHasPermission] = useState(false)
 
   const [shareFile, setShareFile]         = useState(null)
   const [shareStatus, setShareStatus]     = useState('idle')
@@ -195,34 +193,6 @@ export default function MusicPlayer() {
   const totalChunksRef   = useRef(0)
   const pendingDecodeRef = useRef(null)
 
-  useEffect(() => { checkPermission() }, [])
-
-  useEffect(() => {
-    if (!hasPermission || !NotificationListener) return
-    const sub = NotificationListener.addListener((notification) => {
-      if (notification?.app === 'com.spotify.music') {
-        const track = notification.title || null
-        const art   = notification.text  || null
-        setTrackName(track)
-        setArtist(art)
-        setIsPlaying(true)
-        sendTrackToESP32(track, art)
-      }
-    })
-    return () => { try { sub?.remove() } catch (e) {} }
-  }, [hasPermission])
-
-  const sendTrackToESP32 = async (track, art) => {
-    const ip = getESP32IP()
-    if (!ip) return
-    try {
-      await fetch(`http://${ip}/track`, {   // ✅ dynamic IP
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ track: track ?? '', artist: art ?? '' }),
-      })
-    } catch (e) { console.warn('ESP32 send failed:', e.message) }
-  }
 
   const checkPermission = async () => {
     try {

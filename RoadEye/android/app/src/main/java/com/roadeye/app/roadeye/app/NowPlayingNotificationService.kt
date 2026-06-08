@@ -1,4 +1,5 @@
 package com.roadeye.app
+
 import android.app.Notification
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -7,22 +8,23 @@ class NowPlayingNotificationService : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val notification = sbn.notification ?: return
-
         val extras = notification.extras ?: return
 
-        val title = extras.getString(Notification.EXTRA_TITLE) ?: return
-        val artist = extras.getString(Notification.EXTRA_TEXT) ?: ""
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: return
+        val artist = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
 
-        val packageName = sbn.packageName
+        if (title.isBlank()) return
 
-        // Filter common music apps only
-        val isMusicApp =
-            packageName.contains("spotify") ||
-            packageName.contains("music") ||
-            packageName.contains("youtube") ||
-            packageName.contains("soundcloud")
+        val packageName = sbn.packageName ?: ""
 
-        if (!isMusicApp) return
+        val isPossibleMedia =
+            packageName.contains("spotify", ignoreCase = true) ||
+            packageName.contains("music", ignoreCase = true) ||
+            packageName.contains("youtube", ignoreCase = true) ||
+            packageName.contains("soundcloud", ignoreCase = true) ||
+            notification.category == Notification.CATEGORY_TRANSPORT
+
+        if (!isPossibleMedia) return
 
         NowPlayingModule.sendNowPlayingToReact(title, artist)
     }

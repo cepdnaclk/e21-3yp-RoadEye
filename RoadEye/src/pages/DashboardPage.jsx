@@ -20,10 +20,11 @@ import WeatherCard from '../components/dashboard/WeatherCard'
 import MusicPlayer from '../components/dashboard/MusicPlayer'
 import StatsChart from '../components/dashboard/StatsChart'
 import BottomNav from '../components/dashboard/BottomNav'
-
+import useNowPlayingToHelmet from '../hooks/useNowPlayingToHelmet'
 const C = colors
 
 export default function DashboardPage() {
+  useNowPlayingToHelmet()
   const insets = useSafeAreaInsets()
   const { logout } = useAuth()
   const { darkMode, textScale } = useAppSettings()

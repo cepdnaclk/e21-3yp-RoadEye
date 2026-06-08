@@ -334,6 +334,24 @@ class _HelmetUDP {
    * @param {number} fields.humidity
    * @param {number} fields.weatherIcon  WeatherIcon constant
    */
+  /**
+ * Send a DateTimePacket (PKT_DATETIME 0x05).
+ * Format:
+ * year(uint16), month, day, hour, minute, second
+ */
+  sendDateTime(date = new Date()) {
+    const payload = encodeDateTime(date)
+
+    const hdr = buildHeader(
+      PKT_DATETIME,        // 0x05
+      this._nextFrameId(),
+      0,
+      1,
+      payload.length
+    )
+
+    this._enqueue([...hdr, ...payload])
+  }
   sendWeather(fields = {}) {
     const payload = encodeWeather(fields)
     const hdr     = buildHeader(PKT_WEATHER, this._nextFrameId(), 0, 1, payload.length)
