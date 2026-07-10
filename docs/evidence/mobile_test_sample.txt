@@ -1,0 +1,7 @@
+Sample mobile test output (replace with real jest output)
+
+PASS  src/__tests__/App.test.js
+  ✓ should display emergency button on dashboard (45 ms)
+
+Test Suites: 12 passed, 12 total
+Tests:       134 passed, 134 total

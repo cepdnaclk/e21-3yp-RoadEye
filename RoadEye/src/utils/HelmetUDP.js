@@ -24,7 +24,7 @@
 //   PKT_PONG        (0x08) — reply to ping
 //
 // Weather icon values: 1=sunny  2=cloudy  3=rain
-
+export { encodeNavigation };
 import { Buffer } from 'buffer'
 
 // ── Packet type constants (must match PCLink.h) ───────────────────────────────
