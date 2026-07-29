@@ -1,0 +1,8 @@
+Example curl for POST /api/crashes
+
+curl -X POST https://api.example.com/api/crashes \
+  -H "Authorization: Bearer <jwt>" \
+  -H "Content-Type: application/json" \
+  -d '{"userId":"<uuid>","rideId":"<uuid>","latitude":12.34,"longitude":56.78,"severityScore":8.5}'
+
+Expected response: 201 Created with JSON body containing crash id and timestamps.

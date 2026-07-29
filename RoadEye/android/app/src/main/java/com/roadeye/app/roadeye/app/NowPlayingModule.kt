@@ -1,37 +1,35 @@
 package com.roadeye.app
+
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.modules.core.DeviceEventManagerModule
 
 class NowPlayingModule(
-    private val reactContext: ReactApplicationContext
+    reactContext: ReactApplicationContext
 ) : ReactContextBaseJavaModule(reactContext) {
 
     override fun getName(): String {
         return "NowPlayingModule"
     }
 
+    init {
+        reactContextStatic = reactContext
+    }
+
     companion object {
         private var reactContextStatic: ReactApplicationContext? = null
 
-        fun setReactContext(context: ReactApplicationContext) {
-            reactContextStatic = context
-        }
-
         fun sendNowPlayingToReact(title: String, artist: String) {
-            reactContextStatic
-                ?.getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
-                ?.emit(
-                    "NowPlayingChanged",
-                    mapOf(
-                        "title" to title,
-                        "artist" to artist
-                    )
-                )
-        }
-    }
+            val context = reactContextStatic ?: return
 
-    init {
-        setReactContext(reactContext)
+            val params = Arguments.createMap()
+            params.putString("title", title)
+            params.putString("artist", artist)
+
+            context
+                .getJSModule(DeviceEventManagerModule.RCTDeviceEventEmitter::class.java)
+                .emit("NowPlayingChanged", params)
+        }
     }
 }

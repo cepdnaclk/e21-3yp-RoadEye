@@ -1,0 +1,26 @@
+# Dependencies and caches
+node_modules/
+.expo/
+.expo-shared/
+
+# Android generated/cache files only
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+android/local.properties
+
+# Logs
+*.log
+build_log.txt
+
+# Editor/system files
+.vscode/
+.idea/
+.DS_Store
+
+# Keep Gradle wrapper required by EAS Build
+!android/gradle/wrapper/gradle-wrapper.jar
+!android/gradle/wrapper/gradle-wrapper.properties
+!android/gradlew
+!android/gradlew.bat

@@ -1,0 +1,16 @@
+{
+  "manifest": [
+    {
+      "file": "backend_tests_2026-06-15_1200.log",
+      "type": "backend-tests",
+      "timestamp": "2026-06-15T12:00:00Z",
+      "notes": "Full mvn test run; example entry"
+    },
+    {
+      "file": "mobile_jest_2026-06-15_1215.log",
+      "type": "mobile-tests",
+      "timestamp": "2026-06-15T12:15:00Z",
+      "notes": "Jest run summary"
+    }
+  ]
+}

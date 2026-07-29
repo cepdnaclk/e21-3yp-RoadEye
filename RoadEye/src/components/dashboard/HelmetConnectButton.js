@@ -6,7 +6,7 @@ import {
 import { HELMET_STATE } from '../../hooks/useHelmetConnection'
 import { getESP32IP } from '../../utils/ESP32Discovery'
 import useNowPlayingToHelmet from '../../hooks/useNowPlayingToHelmet'
-
+import HelmetUDP from '../../utils/HelmetUDP'
 // ── Signal bars ───────────────────────────────────────────────────────────────
 function SignalBars({ level }) {
   const heights = [5, 9, 13, 17]
@@ -87,7 +87,18 @@ export default function HelmetConnectButton({ helmet, darkMode = false }) {
 
     return () => clearInterval(interval)
   }, [discovered, isConnected, setHelmetIp])
+  
+  useEffect(() => {
+    if (!isConnected || !helmetIp) return
 
+    HelmetUDP.sendDateTime(new Date())
+
+    const interval = setInterval(() => {
+      HelmetUDP.sendDateTime(new Date())
+    }, 60000)
+
+    return () => clearInterval(interval)
+  }, [isConnected, helmetIp])
   // ── Button press ──────────────────────────────────────────────────────────
   const handlePress = () => {
     if (isScanning) return

@@ -1,0 +1,7 @@
+Sample hardware evidence placeholders
+
+- helmet_serial_crash_2026-06-15.log: serial output containing crash detection and PKT_CRASH send
+- ble_sniffer_trace.pcap: BLE packets showing sensor streaming
+- pclink_stream.pcap: UDP capture showing JPEG/PCM chunks
+
+Attach real logs and photos here.

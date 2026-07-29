@@ -1,0 +1,6 @@
+Sample backend test output (replace with real log)
+
+[INFO] Results:
+Tests run: 512, Failures: 0, Errors: 0, Skipped: 3
+
+Save full surefire reports and jacoco coverage to accompany this file.
