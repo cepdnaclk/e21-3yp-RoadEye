@@ -2,6 +2,8 @@ package com.roadeye.controller;
 
 import com.roadeye.model.TiltEvent;
 import com.roadeye.service.TiltEventService;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -40,7 +42,7 @@ public class TiltEventController {
      * }
      */
     @PostMapping("/event")
-    public ResponseEntity<?> receiveTiltEvent(@RequestBody TiltEventRequest request) {
+    public ResponseEntity<?> receiveTiltEvent(@RequestBody @Valid TiltEventRequest request) {
         try {
             log.info("[API] Tilt event received: userId={} angle={}°",
                     request.getUserId(), request.getTiltAngle());
@@ -103,8 +105,12 @@ public class TiltEventController {
     @lombok.NoArgsConstructor
     @lombok.AllArgsConstructor
     public static class TiltEventRequest {
-        private UUID   userId;
+        @NotNull
+        private UUID userId;
+
+        @NotNull
         private Double tiltAngle;
+
         private Double latitude;    // nullable
         private Double longitude;   // nullable
     }
